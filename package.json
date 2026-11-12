@@ -1,0 +1,23 @@
+{
+  "name": "matrix-bridge",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Your Phone (3)'s Glyph Matrix, powered by your PC. Community project, not affiliated with Nothing.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": ["core", "cli", "desktop"],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p core --noEmit && tsc -p cli --noEmit && tsc -p desktop --noEmit",
+    "build:cli": "npm run build -w cli",
+    "sim": "npm run build -w cli && node cli/dist/matrix.js sim",
+    "dev": "npm run tauri -w desktop -- dev",
+    "dev:web": "npm run dev:web -w desktop",
+    "build:desktop": "npm run tauri -w desktop -- build"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "@types/node": "^22.0.0"
+  }
+}

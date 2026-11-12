@@ -1,0 +1,17 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+# Rust / Tauri
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/captures/
+# Nothing's SDK is not redistributable - fetched by scripts/fetch-sdk
+android/app/libs/*.aar
