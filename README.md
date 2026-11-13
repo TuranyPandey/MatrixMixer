@@ -2,20 +2,42 @@
 
 **Your Phone (3)'s Glyph Matrix, powered by your PC.**
 
-Matrix Bridge turns the Glyph Matrix on the back of a Nothing Phone (3) into a tiny second screen for your computer, and the Glyph Button into an extra PC button. Open source, community-built, and not affiliated with or endorsed by Nothing.
+Matrix Bridge turns the round 25x25 Glyph Matrix on the back of a Nothing Phone (3) into a status light for your desk. Your PC decides what it shows: a message, a build's progress, the song you are playing, a red ring while you are on a call. The Glyph Button becomes an extra key for your PC.
 
-> **Status: early.** The PC side is tested against a simulated phone. The phone app is built against Nothing's SDK but has had little time on real hardware yet. Expect rough edges and please [report them](../../issues).
+Open source, community-built, and not affiliated with or endorsed by Nothing.
+
+![The PC app: type a message and it appears on the matrix preview, and on the phone](docs/images/text.png)
+
+> **Status: early.** Tested on a real Phone (3) over USB, and against a simulated phone. Several newer features have only been tried on one PC. Expect rough edges and please [report them](../../issues).
 
 ## What it does
 
-**PC to phone**
-- Scrolling text
-- A pixel editor with live preview
-- Images and GIFs, shrunk to the 25x25 round matrix
-- Live widgets: Pomodoro, countdown, clock, CPU/RAM meter
-- Connectors: a notice when someone pushes to a GitHub repository you watch or its checks finish, when the PC battery runs low, or when your own script says so. Notices pass once, then hand the matrix back
+**Show things on the matrix**
+- Scrolling text, a pixel editor, and images or GIFs shrunk to the round matrix
+- Widgets: clock, Pomodoro and countdown, CPU/RAM meter, load graph, stocks and crypto ticker, weather
+- A music visualiser: a 12-band spectrum of whatever your PC is playing, with peak caps that hang on the hits
 
-**Phone to PC**
+![A spectrum of the music playing on the PC](docs/images/visualiser.png)
+
+**Let things reach the matrix on their own**
+- A progress ring for long jobs: `matrix progress 42 BUILD`, then DONE when it reaches 100
+- On air: the ring breathes while an app uses your microphone or camera
+- Now playing: the title and artist pass by when a new track starts
+- Calendar: a heads-up before each meeting, from a private .ics link
+- GitHub pushes and CI results, PC battery low or full, and anything your own scripts send
+- A game HUD for Counter-Strike 2: health on the ring, ammo on a bar
+
+Notices pass once, then hand the matrix back to whatever was showing.
+
+![A build's progress filling the ring](docs/images/progress.png)
+
+**The island**
+
+A small always-on-top pill on your PC desktop mirrors the matrix. Hover it for brightness, a quick message box and Clear. Put it in any of six spots, or switch it off.
+
+<img src="docs/images/island-open.png" width="400" alt="The island opened on hover: live matrix, status, brightness and a message box">
+
+**Use the phone as a PC button**
 - Long-press the Glyph Button to play/pause media, mute, lock the PC or run any command
 
 **For developers**
@@ -38,7 +60,7 @@ npm test && matrix send "tests passed" || matrix send "TESTS FAILED"
  └──────────────────────────────┘ button events └─────────────────────────┘
 ```
 
-The PC renders everything into finished 25x25 frames. The phone only draws them and reports button presses, which keeps the Android app small. Nothing leaves your local network: no cloud, no account.
+The PC renders everything into finished 25x25 frames. The phone only draws them and reports button presses, which keeps the Android app small. No cloud and no account: PC and phone talk directly over your own network or USB. The only outside services are the optional weather, ticker and calendar features.
 
 | Folder | What | Built with |
 |---|---|---|
@@ -70,6 +92,7 @@ Nothing OS only shares the Glyph Button with the Glyph Toy that is currently sel
 ```
 matrix send "build passed"            scroll text
 matrix notify "build passed"          blink, pass once, then give the matrix back
+matrix progress 42 BUILD              fill the ring as a job runs; "done" finishes it
 matrix image logo.png --invert        show a PNG or JPEG
 matrix brightness 120
 matrix clear
@@ -84,6 +107,7 @@ While the PC app is running, commands go through it. The HTTP API behind it is d
 - Traffic is unencrypted and meant for a network you trust. Anyone on the same network can see the frames (not much of a secret: it is 625 brightness values).
 - The PC's local API listens on `127.0.0.1` only, needs a token that changes every launch, and refuses requests from web pages.
 - "Run a command" actions run exactly what you typed, as you. Only you can set them, from the PC app.
+- The visualiser analyses your PC's sound as it plays and never stores it. The weather, ticker and calendar features contact Open-Meteo, Yahoo Finance and your calendar provider; nothing else leaves your network.
 
 ## Contributing
 
