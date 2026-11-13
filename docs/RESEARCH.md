@@ -21,12 +21,31 @@ Web research into what Phone (3) owners ask for from the Glyph Matrix, and how i
 | Games | Glyph Bike, snake, Arkanoid | Low: phone-side toys do this well |
 
 ## Suggested next features
-1. Progress ring connector (`matrix progress 42`, API endpoint).
-2. Now playing plus a visualiser from PC audio.
-3. More connectors: stocks/crypto, calendar, Discord/Teams mentions; on-air mic light for calls.
-4. Once stable, post in the Nothing Community toy index thread.
+Updated 2026-11-13 after a second search (desk status lights, Stream Deck, LED matrix use cases).
+
+Build first (small, reuse connectors and notices):
+1. Progress ring: `matrix progress 42`, `POST /progress`, hooks for downloads, builds, renders and test runs.
+2. On-air light: detect mic or camera in use (Windows privacy registry keys) and show a red ON AIR ring. Busylights (Luxafor, Kuando) sell hardware for exactly this.
+3. Now playing plus a visualiser: Windows media session for the title, WASAPI loopback for the levels. Glyph Beat does this on the phone; nobody does it from a PC.
+
+Next:
+4. PC stats faces: CPU/GPU temperature and load as bars (stats already collected in Rust). Framework LED matrix owners ask for this.
+5. Stream Deck plugin: buttons that send notices or switch scenes, as busylight makers ship.
+6. More connectors: stocks/crypto ticker, calendar, Discord/Teams mentions.
+7. AI usage ring: tokens or credits as a ring, fed from the PC (a community toy already shows Claude usage limits).
+8. Game HUD: health or ammo as a bar from games with state APIs (CS2 Game State Integration).
+
+Lower priority:
+9. Weather and clock face (Aeroglyph does this on the phone).
+10. Face-down reminders (needs phone sensors, so it belongs in the phone app).
+11. Once stable, post in the Nothing Community toy index thread.
 
 ## Sources
+- [Luxafor + Stream Deck](https://luxafor.com/news/luxafor-integrates-with-elgato-stream-deck/)
+- [iGoX BusyLight Stream Deck plugin](https://marketplace.elgato.com/product/igox-busylight-7448a0be-6dd6-4711-ba0d-86c52b9075b9)
+- [Framework: LED matrix use cases](https://community.frame.work/t/use-cases-for-the-led-matrix-module/39171?page=3)
+- [Aeroglyph weather toy](https://nothing.community/d/52633-release-aeroglyph-turn-your-glyph-interface-into-a-weather-station)
+- [Glyph toys concept (reminders)](https://nothing.community/d/37445-glyph-matrix-glyph-toys-concept)
 - [Android Authority: Glyph Matrix still feels like a gimmick](https://www.androidauthority.com/nothing-glyph-matrix-gimmick-3602057/)
 - [Gizmodo: Nothing says the Phone 3 isn't one big gimmick](https://gizmodo.com/nothing-says-the-phone-3-isnt-one-big-gimmick-but-im-not-so-sure-2000623553)
 - [NothingTec: You're misusing the Glyph Matrix](https://nothingtec.com/en/2026/01/27/estas-usando-mal-glyph-matrix-nothing/)

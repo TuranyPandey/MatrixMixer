@@ -43,7 +43,7 @@ Next steps, in the order agreed or suggested:
 1. Clarify and fix the arrow flash on the PC Remote toy (user: "flashes too slowly", and after one long-press something "doesn't come back").
 2. Confirm the GitHub connector end to end: watch `TuranyPandey/MatrixMixer`, push, see the notice on the phone.
 3. Merge `hardware-verification` into `main` and push, once the user says so.
-4. Next features, from community research in docs/RESEARCH.md: progress ring connector (`matrix progress 42`), now playing + music visualiser from PC audio, more connectors (stocks/crypto, calendar, Discord/Teams mentions), on-air mic light for calls.
+4. Next features: see "Suggested next features" in docs/RESEARCH.md (progress ring, on-air light, now playing + visualiser first).
 5. Phone app has not had the redesign; offer it.
 6. Plan for the Phone (4a) Pro's 13x13 matrix: everything assumes 25x25.
 
