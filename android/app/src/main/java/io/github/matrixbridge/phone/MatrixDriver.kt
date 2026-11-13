@@ -2,6 +2,9 @@ package io.github.matrixbridge.phone
 
 import android.content.ComponentName
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import com.nothing.ketchum.Glyph
 import com.nothing.ketchum.GlyphMatrixManager
@@ -28,6 +31,12 @@ object MatrixDriver {
     private var connected = false
     private var users = 0
     private var toyActive = false
+
+    /** How long the arrow shows after landing on the toy, before the PC's frame takes over. */
+    private const val MARKER_MS = 1200L
+    private val main = Handler(Looper.getMainLooper())
+    private var markerUntil = 0L
+    private val endMarker = Runnable { synchronized(lock) { redraw() } }
 
     /** Last frame from the PC, 0..255 per pixel. Null means nothing to show. */
     private var frame: IntArray? = null
@@ -112,6 +121,10 @@ object MatrixDriver {
                 }
             }
             toyActive = active
+            // Flash the arrow on arrival, so the toy is recognisable even while the PC is sending frames.
+            main.removeCallbacks(endMarker)
+            markerUntil = if (active) SystemClock.uptimeMillis() + MARKER_MS else 0L
+            if (active) main.postDelayed(endMarker, MARKER_MS)
             redraw()
         }
     }
@@ -121,9 +134,10 @@ object MatrixDriver {
         if (!connected) return
         val px = frame
         if (px == null && !toyActive) return
-        // With the toy selected and nothing from the PC yet, show a marker so it is
-        // obvious which toy this is while cycling with the Glyph Button.
-        val source = px ?: IDLE_FRAME
+        // Just after the toy is selected, or with nothing from the PC yet, show a marker so
+        // it is obvious which toy this is while cycling with the Glyph Button.
+        val marker = toyActive && SystemClock.uptimeMillis() < markerUntil
+        val source = if (px == null || marker) IDLE_FRAME else px
         val levels = IntArray(Protocol.PIXELS) { i -> source[i] * brightness / 255 * MAX_LEVEL / 255 }
         try {
             if (toyActive) gm.setMatrixFrame(levels) else gm.setAppMatrixFrame(levels)

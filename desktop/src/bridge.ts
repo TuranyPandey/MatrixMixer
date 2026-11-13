@@ -199,6 +199,9 @@ async function handleButton(action: ButtonAction): Promise<void> {
       result = err instanceof Error ? err.message : String(err);
     }
   }
+  // A long-press is followed by "up" straight away. A gesture with no action must not hide the result of one that ran.
+  const last = state.lastButton;
+  if (binding.kind === 'none' && last && last.result !== 'No action set' && Date.now() - last.at < 3000) return;
   set({ lastButton: { action, at: Date.now(), result } });
 }
 

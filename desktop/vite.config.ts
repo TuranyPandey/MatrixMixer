@@ -10,6 +10,7 @@ export default defineConfig({
   },
   // Tauri expects a fixed port and shows its own errors.
   clearScreen: false,
-  server: { port: 1420, strictPort: true },
+  // Do not watch Rust's build output: cargo locks files there and the watcher crashes (EBUSY).
+  server: { port: 1420, strictPort: true, watch: { ignored: ['**/src-tauri/**'] } },
   build: { target: 'es2022', outDir: 'dist' },
 });

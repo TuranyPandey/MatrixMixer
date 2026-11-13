@@ -27,7 +27,9 @@ class PcRemoteToyService : Service() {
     private val handler = object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
             if (msg.what != GlyphToy.MSG_GLYPH_TOY) return super.handleMessage(msg)
-            when (msg.data?.getString(GlyphToy.MSG_GLYPH_TOY_DATA)) {
+            val event = msg.data?.getString(GlyphToy.MSG_GLYPH_TOY_DATA)
+            Log.d(TAG, "Button event: $event (PC listening: ${Bridge.onButton != null})")
+            when (event) {
                 GlyphToy.EVENT_CHANGE -> Bridge.onButton?.invoke("long")
                 GlyphToy.EVENT_ACTION_DOWN -> Bridge.onButton?.invoke("down")
                 GlyphToy.EVENT_ACTION_UP -> Bridge.onButton?.invoke("up")

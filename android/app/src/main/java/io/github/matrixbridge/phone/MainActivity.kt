@@ -30,6 +30,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
@@ -70,7 +71,10 @@ class MainActivity : ComponentActivity() {
                     background = Color.Black, surface = Color.Black,
                     onBackground = Color.White, onSurface = Color.White,
                 ),
-            ) { BridgeScreen() }
+            ) {
+                // Surface sets the default text colour; without it plain Text is black on black.
+                Surface(color = Color.Black, contentColor = Color.White) { BridgeScreen() }
+            }
         }
     }
 }
