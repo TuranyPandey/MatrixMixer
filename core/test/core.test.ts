@@ -14,8 +14,10 @@ import {
   encode,
   formatDuration,
   frameToAscii,
+  githubNews,
   isLed,
   meterFrame,
+  noticeSource,
   renderText,
   renderTiny,
   rgbaToFrame,
@@ -208,11 +210,75 @@ describe('player', () => {
     expect(player.label).toBeNull();
   });
 
+  it('shows a notice, then goes back to what was playing', async () => {
+    const player = new Player();
+    const labels: (string | null)[] = [];
+    player.onSourceChange((label) => labels.push(label));
+    const dot = blankFrame();
+    dot[12 * SIZE + 12] = 255;
+    player.show(dot, 'base');
+    player.notify(animationSource([dot, dot], 30, false, 'first'));
+    player.notify(animationSource([dot], 30, false, 'second'));
+    await new Promise((r) => setTimeout(r, 250));
+    expect(labels.filter((l) => l !== null)).toEqual(['base', 'first', 'second', 'base']);
+    expect(player.label).toBe('base');
+    player.stop();
+  });
+
+  it('does not go back if the user plays something during a notice', async () => {
+    const player = new Player();
+    const dot = blankFrame();
+    player.show(dot, 'base');
+    player.notify(animationSource([dot, dot, dot, dot], 30, false, 'notice'));
+    player.show(dot, 'chosen');
+    await new Promise((r) => setTimeout(r, 200));
+    expect(player.label).toBe('chosen');
+    player.stop();
+  });
+
+  it('a notice blinks the ring, passes once and ends', () => {
+    const source = noticeSource('HI');
+    let ticks = 0;
+    while (source.next(ticks) !== null && ticks < 10_000) ticks++;
+    expect(ticks).toBeGreaterThan(10);
+    expect(ticks).toBeLessThan(200);
+    const lit = (tick: number) => source.next(tick)!.reduce((a, b) => a + (b ? 1 : 0), 0);
+    expect(lit(0)).toBe(RING.length);
+    expect(lit(3)).toBe(0);
+  });
+
   it('resolves the old play when a new source replaces it', async () => {
     const player = new Player();
     const first = player.play(textSource('forever and ever and ever'));
     player.show(blankFrame());
     await first;
     player.stop();
+  });
+});
+
+describe('github connector', () => {
+  const push = (id: number, type = 'push') => ({ id, ref: 'refs/heads/main', activity_type: type, actor: { login: 'octocat' } });
+  const run = (id: number, status: string, conclusion: string | null) => ({ id, name: 'Build', head_branch: 'main', status, conclusion });
+
+  it('takes stock on the first poll without replaying history', () => {
+    const news = githubNews('me/repo', null, [push(2), push(1)], [run(10, 'completed', 'success')]);
+    expect(news.messages).toEqual([]);
+    expect(news.snapshot).toEqual({ activity: [2, 1], runs: [10] });
+  });
+
+  it('reports new pushes oldest first, and CI once it finishes', () => {
+    const first = githubNews('me/repo', null, [push(1)], [run(10, 'in_progress', null)]);
+    const second = githubNews('me/repo', first.snapshot, [push(3, 'force_push'), push(2), push(1)], [run(10, 'in_progress', null)]);
+    expect(second.messages).toEqual(['REPO: OCTOCAT PUSHED TO MAIN', 'REPO: OCTOCAT FORCE-PUSHED MAIN']);
+    const third = githubNews('me/repo', second.snapshot, [push(3), push(2), push(1)], [run(10, 'completed', 'failure')]);
+    expect(third.messages).toEqual(['REPO: BUILD FAILED ON MAIN']);
+    const fourth = githubNews('me/repo', third.snapshot, [push(3)], [run(10, 'completed', 'failure')]);
+    expect(fourth.messages).toEqual([]);
+  });
+
+  it('respects what is switched off and stays quiet about cancelled runs', () => {
+    const base = githubNews('me/repo', null, [], []).snapshot;
+    const news = githubNews('me/repo', base, [push(1)], [run(10, 'completed', 'success'), run(11, 'completed', 'cancelled')], { pushes: false, ci: true });
+    expect(news.messages).toEqual(['REPO: BUILD PASSED ON MAIN']);
   });
 });

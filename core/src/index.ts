@@ -4,4 +4,5 @@ export * from './font';
 export * from './image';
 export * from './widgets';
 export * from './player';
+export * from './connectors';
 export * from './client';

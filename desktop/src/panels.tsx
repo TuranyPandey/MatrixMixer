@@ -25,11 +25,24 @@ import {
   useBridge,
   type ActionKind,
 } from './bridge';
+import { DotText } from './DotText';
 import { MatrixView } from './MatrixView';
 import { apiInfo, discoverPhones, isTauri, runAction, type ApiInfo, type FoundPhone } from './native';
 import { startClock, startCountdown, startMeter, startPomodoro, stopTimer, toggleTimer, useTimer } from './widgets';
 
 type PanelProps = { go: (tab: string) => void };
+
+/** Page heading set in the matrix's own dot font, with one line that says what the page is for. */
+export function PageTitle({ title, lede }: { title: string; lede: string }) {
+  return (
+    <header className="page-head">
+      <h1 aria-label={title}>
+        <DotText text={title} cell={4} />
+      </h1>
+      <p className="lede">{lede}</p>
+    </header>
+  );
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -68,7 +81,7 @@ export function ConnectPanel({ go }: PanelProps) {
   if (bridge.connection === 'connected') {
     return (
       <>
-        <h1>Phone</h1>
+        <PageTitle title="Phone" lede="Get your phone on the line. You only pair once." />
         <Section title="Connected">
           <p className="big">{bridge.phoneName ?? 'Phone'}</p>
           <p className="muted mono">
@@ -102,7 +115,7 @@ export function ConnectPanel({ go }: PanelProps) {
     const ready = /^\d{6}$/.test(code.replace(/\s/g, ''));
     return (
       <>
-        <h1>Phone</h1>
+        <PageTitle title="Phone" lede="Get your phone on the line. You only pair once." />
         <Section title="Enter the code">
           <p>
             Open Matrix Bridge on {bridge.phoneName ?? 'the phone'} and type the 6-digit pairing code it shows. You only do
@@ -140,7 +153,7 @@ export function ConnectPanel({ go }: PanelProps) {
   const busy = bridge.connection === 'connecting' || bridge.connection === 'reconnecting';
   return (
     <>
-      <h1>Phone</h1>
+      <PageTitle title="Phone" lede="Get your phone on the line. You only pair once." />
       {busy && (
         <Section title={bridge.connection === 'connecting' ? 'Connecting' : 'Reconnecting'}>
           <p>
@@ -222,7 +235,7 @@ export function TextPanel(_: PanelProps) {
   };
   return (
     <>
-      <h1>Text</h1>
+      <PageTitle title="Text" lede="Say it in 25 dots. Long messages scroll." />
       <Section title="Scroll a message">
         <form
           onSubmit={(ev) => {
@@ -328,7 +341,7 @@ export function DrawPanel(_: PanelProps) {
 
   return (
     <>
-      <h1>Draw</h1>
+      <PageTitle title="Draw" lede={`${LED_COUNT} LEDs and a mouse. Make them count.`} />
       <Section title="Pixel editor">
         <div className="toolbar">
           <div className="segmented" role="group" aria-label="Brush">
@@ -510,7 +523,7 @@ export function ImagePanel(_: PanelProps) {
 
   return (
     <>
-      <h1>Image</h1>
+      <PageTitle title="Image" lede="Any picture or GIF, squashed down to 25 by 25." />
       <Section title="Picture or GIF">
         <div
           className={dragging ? 'drop over' : 'drop'}
@@ -612,7 +625,7 @@ export function WidgetsPanel(_: PanelProps) {
 
   return (
     <>
-      <h1>Widgets</h1>
+      <PageTitle title="Widgets" lede="Small things worth a glance at the back of your phone." />
       <p className="muted">One widget runs at a time. Starting another replaces it.</p>
 
       <Section title="Timer">
@@ -710,7 +723,7 @@ export function ButtonsPanel(_: PanelProps) {
 
   return (
     <>
-      <h1>Glyph Button</h1>
+      <PageTitle title="Glyph Button" lede="One button on the back of the phone. Your PC on the other end." />
       <Section title="How it works">
         <p>
           Nothing OS only shares the Glyph Button with the Glyph Toy that is currently selected. So: on the phone, add the
@@ -797,7 +810,7 @@ export function DeveloperPanel(_: PanelProps) {
 
   return (
     <>
-      <h1>Developer</h1>
+      <PageTitle title="Developer" lede="Script it. Pipe it. Wire it into your builds." />
       <Section title="matrix CLI">
         <p>Any script can push to the matrix while this app is running.</p>
         <pre>{`matrix send "build passed"

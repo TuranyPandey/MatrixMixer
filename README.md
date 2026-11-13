@@ -13,6 +13,7 @@ Matrix Bridge turns the Glyph Matrix on the back of a Nothing Phone (3) into a t
 - A pixel editor with live preview
 - Images and GIFs, shrunk to the 25x25 round matrix
 - Live widgets: Pomodoro, countdown, clock, CPU/RAM meter
+- Connectors: a notice when someone pushes to a GitHub repository you watch or its checks finish, when the PC battery runs low, or when your own script says so. Notices pass once, then hand the matrix back
 
 **Phone to PC**
 - Long-press the Glyph Button to play/pause media, mute, lock the PC or run any command
@@ -68,6 +69,7 @@ Nothing OS only shares the Glyph Button with the Glyph Toy that is currently sel
 
 ```
 matrix send "build passed"            scroll text
+matrix notify "build passed"          blink, pass once, then give the matrix back
 matrix image logo.png --invert        show a PNG or JPEG
 matrix brightness 120
 matrix clear

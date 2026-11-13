@@ -20,7 +20,7 @@ const MAX_BODY: u64 = 8 * 1024 * 1024;
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiRequest {
-    /// `/text`, `/frame`, `/image`, `/clear` or `/brightness`.
+    /// `/text`, `/notify`, `/frame`, `/image`, `/clear` or `/brightness`.
     pub path: String,
     /// Raw query string without the `?`, e.g. `invert=1`.
     pub query: String,
@@ -105,7 +105,7 @@ pub fn start(
                 let _ = request.respond(json(200, &body));
                 continue;
             }
-            let known = matches!(path, "/text" | "/frame" | "/image" | "/clear" | "/brightness");
+            let known = matches!(path, "/text" | "/notify" | "/frame" | "/image" | "/clear" | "/brightness");
             if method != Method::Post || !known {
                 let _ = request.respond(json(404, r#"{"ok":false,"error":"Unknown endpoint"}"#));
                 continue;

@@ -5,6 +5,7 @@
 mod actions;
 mod api;
 mod discovery;
+mod github;
 mod stats;
 
 use std::sync::{Arc, Mutex};
@@ -36,6 +37,14 @@ fn system_stats(stats: State<'_, stats::Stats>) -> stats::Sample {
 #[tauri::command]
 fn run_action(kind: String, arg: Option<String>) -> Result<(), String> {
     actions::run(&kind, arg)
+}
+
+/// Read-only GitHub lookup for the GitHub connector. See github.rs for what is allowed.
+#[tauri::command]
+async fn github_get(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || github::get(&path))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -121,6 +130,7 @@ pub fn run() {
             discover,
             system_stats,
             run_action,
+            github_get,
             api_info,
             set_status,
             pc_name

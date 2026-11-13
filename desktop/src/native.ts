@@ -66,6 +66,18 @@ export async function runAction(kind: string, arg?: string): Promise<void> {
   await invoke('run_action', { kind, arg: arg ?? null });
 }
 
+/**
+ * Read-only GitHub lookup for the GitHub connector. `path` is like
+ * `repos/owner/repo/activity?per_page=20`. The desktop app asks through the
+ * GitHub CLI, so no token is handled here; a browser can only see public repositories.
+ */
+export async function githubGet(path: string): Promise<unknown> {
+  if (isTauri) return JSON.parse(await invoke<string>('github_get', { path }));
+  const res = await fetch(`https://api.github.com/${path}`, { headers: { Accept: 'application/vnd.github+json' } });
+  if (!res.ok) throw new Error(res.status === 404 ? 'Not found (or private)' : `GitHub answered ${res.status}`);
+  return res.json();
+}
+
 export async function apiInfo(): Promise<ApiInfo | null> {
   return isTauri ? invoke<ApiInfo>('api_info') : null;
 }

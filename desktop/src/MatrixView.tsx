@@ -34,6 +34,9 @@ export function MatrixView({ frame, subscribe, size, onPaint, label }: Props) {
           // Unlit LEDs stay faintly visible so the shape reads even when blank.
           const level = Math.round(34 + Math.pow(v, 0.6) * 221);
           ctx.fillStyle = v > 0 ? `rgb(${level},${level},${level})` : '#1c1c1c';
+          // Lit LEDs bleed a very little light.
+          ctx.shadowColor = '#fff';
+          ctx.shadowBlur = v > 0 ? cell * 0.3 * v : 0;
           ctx.beginPath();
           ctx.arc((x + 0.5) * cell, (y + 0.5) * cell, cell * 0.36, 0, Math.PI * 2);
           ctx.fill();

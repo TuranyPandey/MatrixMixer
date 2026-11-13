@@ -94,6 +94,10 @@ export class Player {
   private sourceListeners = new Set<(label: string | null) => void>();
   private last: Frame = blankFrame();
   private finish: (() => void) | null = null;
+  /** Notices waiting their turn, and a counter that changes whenever the user takes the matrix back. */
+  private notices: Source[] = [];
+  private noticing = false;
+  private turn = 0;
 
   /** The most recent frame, for late subscribers. */
   get current(): Frame {
@@ -116,6 +120,39 @@ export class Player {
 
   /** Starts a source. Resolves when it finishes or is replaced. */
   play(source: Source): Promise<void> {
+    this.dropNotices();
+    return this.start(source);
+  }
+
+  /**
+   * Shows a finite source over whatever is playing, then goes back to it.
+   * Notices that arrive while one is showing wait their turn. Playing or
+   * stopping anything else in the meantime cancels them and the going back.
+   */
+  notify(source: Source): void {
+    this.notices.push(source);
+    if (!this.noticing) void this.runNotices();
+  }
+
+  private async runNotices(): Promise<void> {
+    const turn = ++this.turn;
+    this.noticing = true;
+    const resume = this.source;
+    while (this.notices.length > 0) {
+      await this.start(this.notices.shift()!);
+      if (turn !== this.turn) return;
+    }
+    this.noticing = false;
+    if (resume) void this.start(resume);
+  }
+
+  private dropNotices(): void {
+    this.notices = [];
+    this.noticing = false;
+    this.turn++;
+  }
+
+  private start(source: Source): Promise<void> {
     this.cancel();
     this.source = source;
     this.tick = 0;
@@ -147,6 +184,7 @@ export class Player {
 
   /** Stops whatever is playing and blanks the matrix. */
   stop(): void {
+    this.dropNotices();
     this.cancel();
     this.source = null;
     this.emit(blankFrame());

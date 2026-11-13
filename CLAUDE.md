@@ -25,6 +25,28 @@ PC companion for the Nothing Phone (3) Glyph Matrix. Read README.md, docs/SETUP.
 - Real-phone checklist: docs/SETUP.md section 5. Results are below.
 - Not built yet: now-playing widget, Google Calendar widget, animation editor (.glyph format).
 
+## Where we left off (2026-11-13) — read this first
+Work is on branch `hardware-verification` (not merged, not pushed). Next session starts from the list below.
+
+Done in the last session, after the hardware run:
+- PC app redesign: page titles and logo drawn in the matrix's 5x7 dot font (`desktop/src/DotText.tsx`), status wording with some voice ("No phone on the line", "Linked"), dotted sliders, flat open sections divided by hairlines.
+- Connectors tab (`desktop/src/ConnectorsPanel.tsx`, `desktop/src/connectors.ts`): GitHub (pushes, merges, CI pass/fail, polled every 60 s via `gh api`, read-only allowlist in `desktop/src-tauri/src/github.rs`), PC battery low/full, recent notices list.
+- Notices: `Player.notify()` in `core/src/player.ts` shows a finite source (ring blinks twice, text passes once) then resumes what was playing. `noticeSource` and `githubNews` are in `core/src/connectors.ts`, with tests. Exposed as `POST /notify` and `matrix notify "text"`.
+
+Not yet verified for the above: a real push arriving as a notice in the Tauri app, battery notices firing, `matrix notify` from an installed CLI, and how notices look on the real phone.
+
+User's design preferences (from feedback on the redesign):
+- Keep: dot-font titles, monochrome + red accent, the voice in the wording.
+- No: glassy/glowy effects or gradients, numbering on nav items, animated titles or slide-in cards, boxed/bordered content cards. Prefer flat, open sections.
+
+Next steps, in the order agreed or suggested:
+1. Clarify and fix the arrow flash on the PC Remote toy (user: "flashes too slowly", and after one long-press something "doesn't come back").
+2. Confirm the GitHub connector end to end: watch `TuranyPandey/MatrixMixer`, push, see the notice on the phone.
+3. Merge `hardware-verification` into `main` and push, once the user says so.
+4. Next features, from community research in docs/RESEARCH.md: progress ring connector (`matrix progress 42`), now playing + music visualiser from PC audio, more connectors (stocks/crypto, calendar, Discord/Teams mentions), on-air mic light for calls.
+5. Phone app has not had the redesign; offer it.
+6. Plan for the Phone (4a) Pro's 13x13 matrix: everything assumes 25x25.
+
 ## Verified on hardware (2026-11-13)
 Phone (3) model A024, Nothing OS build `C5.0-260924-2115` (Android 17), connected over USB (`adb forward tcp:8765 tcp:8765`) while charging. Wi-Fi was not tested: the phone was on mobile data with a VPN.
 

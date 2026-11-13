@@ -8,6 +8,7 @@ import {
   MatrixClient,
   Player,
   frameFromArray,
+  noticeSource,
   rgbaToFrame,
   textSource,
   type ButtonAction,
@@ -30,12 +31,19 @@ export type ActionKind =
   | 'command';
 export type ButtonBinding = { kind: ActionKind; command: string };
 
+/** Things that reach the matrix on their own. See connectors.ts. */
+export type ConnectorSettings = {
+  github: { enabled: boolean; repos: string[]; pushes: boolean; ci: boolean };
+  battery: { enabled: boolean; low: number };
+};
+
 export type Settings = {
   host: string;
   port: number;
   token: string | null;
   brightness: number;
   buttons: Record<ButtonAction, ButtonBinding>;
+  connectors: ConnectorSettings;
 };
 
 const DEFAULTS: Settings = {
@@ -48,6 +56,10 @@ const DEFAULTS: Settings = {
     down: { kind: 'none', command: '' },
     up: { kind: 'none', command: '' },
   },
+  connectors: {
+    github: { enabled: false, repos: [], pushes: true, ci: true },
+    battery: { enabled: false, low: 20 },
+  },
 };
 
 const KEY = 'matrix-bridge.settings';
@@ -55,7 +67,15 @@ const KEY = 'matrix-bridge.settings';
 function loadSettings(): Settings {
   try {
     const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>;
-    return { ...DEFAULTS, ...saved, buttons: { ...DEFAULTS.buttons, ...saved.buttons } };
+    return {
+      ...DEFAULTS,
+      ...saved,
+      buttons: { ...DEFAULTS.buttons, ...saved.buttons },
+      connectors: {
+        github: { ...DEFAULTS.connectors.github, ...saved.connectors?.github },
+        battery: { ...DEFAULTS.connectors.battery, ...saved.connectors?.battery },
+      },
+    };
   } catch {
     return DEFAULTS;
   }
@@ -115,6 +135,11 @@ export function useBridge(): BridgeState {
     },
     () => state,
   );
+}
+
+/** For code outside React (connectors, widgets). */
+export function getSettings(): Settings {
+  return state.settings;
 }
 
 export function updateSettings(patch: Partial<Settings>): void {
@@ -223,6 +248,9 @@ export function bitmapToFrame(image: CanvasImageSource, width: number, height: n
 
 // ---- local API requests (from the CLI and scripts) ---------------------------------
 
+/** Who to hand `POST /notify` texts to. Empty means "just show it". */
+export const apiNotices = new Set<(text: string) => void>();
+
 async function handleApi(request: ApiRequest): Promise<void> {
   try {
     const body = request.body ? (JSON.parse(request.body) as Record<string, unknown>) : {};
@@ -234,6 +262,14 @@ async function handleApi(request: ApiRequest): Promise<void> {
         const loops = typeof body.loops === 'number' && body.loops > 0 ? body.loops : Infinity;
         const speedMs = typeof body.speedMs === 'number' ? Math.max(20, Math.min(1000, body.speedMs)) : 60;
         void player.play(textSource(text, { loops, speedMs }));
+        break;
+      }
+      case '/notify': {
+        const text = typeof body.text === 'string' ? body.text.trim() : '';
+        if (!text) return;
+        // connectors.ts listens here so script notices show up in its recent list too.
+        if (apiNotices.size > 0) apiNotices.forEach((fn) => fn(text));
+        else player.notify(noticeSource(text));
         break;
       }
       case '/frame':

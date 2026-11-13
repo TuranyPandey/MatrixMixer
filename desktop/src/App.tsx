@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
 import type { ConnectionState, Frame } from '@matrix-bridge/core';
 import { clearMatrix, player, setBrightness, useBridge } from './bridge';
+import { ConnectorsPanel } from './ConnectorsPanel';
+import { DotText } from './DotText';
 import { MatrixView } from './MatrixView';
 import { ButtonsPanel, ConnectPanel, DeveloperPanel, DrawPanel, ImagePanel, TextPanel, WidgetsPanel } from './panels';
 
@@ -10,6 +12,7 @@ const TABS = [
   { id: 'draw', label: 'Draw', Panel: DrawPanel },
   { id: 'image', label: 'Image', Panel: ImagePanel },
   { id: 'widgets', label: 'Widgets', Panel: WidgetsPanel },
+  { id: 'connectors', label: 'Connectors', Panel: ConnectorsPanel },
   { id: 'buttons', label: 'Button', Panel: ButtonsPanel },
   { id: 'developer', label: 'Developer', Panel: DeveloperPanel },
 ] as const;
@@ -17,11 +20,11 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id'];
 
 const STATUS: Record<ConnectionState, string> = {
-  offline: 'Not connected',
-  connecting: 'Connecting',
-  pairing: 'Waiting for code',
-  connected: 'Connected',
-  reconnecting: 'Reconnecting',
+  offline: 'No phone on the line',
+  connecting: 'Dialling',
+  pairing: 'Waiting for the code',
+  connected: 'Linked',
+  reconnecting: 'Lost it. Redialling',
 };
 
 export function App() {
@@ -36,14 +39,13 @@ export function App() {
   return (
     <div className="shell">
       <nav className="nav" aria-label="Sections">
-        <div className="brand">
-          MATRIX
-          <br />
-          BRIDGE
+        <div className="brand" role="img" aria-label="Matrix Bridge">
+          <DotText text="Matrix" cell={3} />
+          <DotText text="Bridge" cell={3} color="#e5262b" />
         </div>
         {TABS.map((t) => (
           <button key={t.id} className={t.id === tab ? 'tab active' : 'tab'} onClick={() => setTab(t.id)}>
-            {t.label}
+            <span className="tab-label">{t.label}</span>
             {t.id === 'connect' && <span className={`dot ${bridge.connection}`} aria-hidden="true" />}
           </button>
         ))}
@@ -56,13 +58,18 @@ export function App() {
             {bridge.error}
           </div>
         )}
-        <Panel go={(id: string) => setTab(id as TabId)} />
+        <div className="page" key={tab}>
+          <Panel go={(id: string) => setTab(id as TabId)} />
+        </div>
       </main>
 
-      <aside className="side" aria-label="Live preview">
+      <aside className={`side ${bridge.connection}${bridge.playing ? ' lit' : ''}`} aria-label="Live preview">
         <div className="label">On the matrix</div>
         <MatrixView subscribe={subscribe} size={250} label="Live preview of the Glyph Matrix" />
-        <div className="now">{bridge.playing ?? 'Nothing'}</div>
+        <div className="now">
+          <span className="now-tag">{bridge.playing ? 'Now showing' : 'Dark'}</span>
+          {bridge.playing ?? 'Send something to light it up'}
+        </div>
 
         <div className={`status ${bridge.connection}`}>
           <span className={`dot ${bridge.connection}`} aria-hidden="true" />

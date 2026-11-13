@@ -7,6 +7,7 @@ import {
   MatrixClient,
   Player,
   frameFromArray,
+  noticeSource,
   staticSource,
   textSource,
   type Frame,
@@ -21,6 +22,7 @@ const HELP = `matrix - push things to your Phone (3) Glyph Matrix
 
 Usage
   matrix send <text> [--loops n | --forever] [--speed ms]   scroll text
+  matrix notify <text>            blink, pass once, then give the matrix back
   matrix image <file.png|jpg> [--invert] [--dither] [--contain] [--hold sec]
   matrix frame <file.json | ->                              625 values, 0-255
   matrix brightness <0-255>
@@ -183,6 +185,15 @@ async function cmdSend(args: Args): Promise<void> {
   await playDirect(args, textSource(text, { loops, speedMs }), 'done');
 }
 
+/** A notice passes once. Through the desktop app it then hands the matrix back to whatever was showing. */
+async function cmdNotify(args: Args): Promise<void> {
+  const text = args.positional.slice(1).join(' ');
+  if (!text) fail('Nothing to say. Try: matrix notify "build passed"');
+  const api = useApp(args);
+  if (api && (await viaApp(api, '/notify', { json: { text } }))) return;
+  await playDirect(args, noticeSource(text), 'done');
+}
+
 async function cmdImage(args: Args): Promise<void> {
   const file = args.positional[1];
   if (!file) fail('Which file? Try: matrix image logo.png');
@@ -310,6 +321,8 @@ async function main(): Promise<void> {
     case 'send':
     case 'text':
       return cmdSend(args);
+    case 'notify':
+      return cmdNotify(args);
     case 'image':
       return cmdImage(args);
     case 'frame':
