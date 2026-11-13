@@ -1,8 +1,8 @@
 # Matrix Bridge
 
-**Your Phone (3)'s Glyph Matrix, powered by your PC.**
+**Your Nothing phone's Glyph Matrix, powered by your PC.**
 
-Matrix Bridge turns the round 25x25 Glyph Matrix on the back of a Nothing Phone (3) into a status light for your desk. Your PC decides what it shows: a message, a build's progress, the song you are playing, a red ring while you are on a call. The Glyph Button becomes an extra key for your PC.
+Matrix Bridge turns the Glyph Matrix on the back of a Nothing phone into a status light for your desk. Your PC decides what it shows: a message, a build's progress, the song you are playing, a red ring while you are on a call. The Glyph Button becomes an extra key for your PC.
 
 Open source, community-built, and not affiliated with or endorsed by Nothing.
 
@@ -52,15 +52,15 @@ npm test && matrix send "tests passed" || matrix send "TESTS FAILED"
 ## How it works
 
 ```
- PC                                              Phone (3)
+ PC                                              Nothing phone
  ┌──────────────────────────────┐   Wi-Fi/USB   ┌─────────────────────────┐
  │ text / image / widget        │   WebSocket   │ foreground service      │
- │   -> 25x25 frame (TypeScript)│ ────────────> │   -> Glyph Matrix SDK   │
+ │   -> matrix frame (TypeScript)│ ────────────> │   -> Glyph Matrix SDK   │
  │ action runner (Rust)         │ <──────────── │ "PC Remote" Glyph Toy   │
  └──────────────────────────────┘ button events └─────────────────────────┘
 ```
 
-The PC renders everything into finished 25x25 frames. The phone only draws them and reports button presses, which keeps the Android app small. No cloud and no account: PC and phone talk directly over your own network or USB. The only outside services are the optional weather, ticker and calendar features.
+The PC renders everything into finished frames sized for the phone's matrix. The phone only draws them and reports button presses, which keeps the Android app small. No cloud and no account: PC and phone talk directly over your own network or USB. The only outside services are the optional weather, ticker and calendar features.
 
 | Folder | What | Built with |
 |---|---|---|
@@ -79,7 +79,14 @@ Grab the Windows installer and the APK from [Releases](../../releases), or build
 3. Type the 6-digit code shown on the phone.
 4. Send something from the **Text** tab.
 
-Needs a Nothing Phone (3) on a Nothing OS build from August 2025 or later.
+Built for every Nothing phone with a Glyph Matrix:
+
+| Phone | Matrix | Support |
+|---|---|---|
+| Phone (3) | 25x25 | Works, tested on real hardware (Nothing OS from August 2025 or later) |
+| Phone (4a) Pro | 13x13 | Planned: frames are drawn at 25x25 for now |
+
+Own a Glyph Matrix phone that is not on this list? [Open an issue](../../issues) and help add it.
 
 **College or hostel Wi-Fi?** Those networks usually stop devices seeing each other. Plug the phone in, run `adb forward tcp:8765 tcp:8765`, and use **Connect over USB**. A phone hotspot works too.
 
@@ -111,10 +118,10 @@ While the PC app is running, commands go through it. The HTTP API behind it is d
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). You do not need a Phone (3) to work on the PC side: `npm run sim` gives you a fake one.
+See [CONTRIBUTING.md](CONTRIBUTING.md). You do not need a Nothing phone to work on the PC side: `npm run sim` gives you a fake one.
 
 ## Licence and credits
 
 MIT, see [LICENSE](LICENSE). Nothing's Glyph Matrix SDK is not part of this repository; it is downloaded at build time under [Nothing's own licence](https://github.com/Nothing-Developer-Programme/GlyphMatrix-Developer-Kit/blob/main/LICENSE.md), which restricts commercial use.
 
-Nothing, Phone (3), Glyph and Glyph Matrix are trademarks of Nothing Technology Limited. This project is not affiliated with Nothing.
+Nothing, Phone (3), Phone (4a) Pro, Glyph and Glyph Matrix are trademarks of Nothing Technology Limited. This project is not affiliated with Nothing.
