@@ -28,7 +28,21 @@ import {
 import { DotText } from './DotText';
 import { MatrixView } from './MatrixView';
 import { apiInfo, discoverPhones, isTauri, runAction, type ApiInfo, type FoundPhone } from './native';
-import { startClock, startCountdown, startMeter, startPomodoro, stopTimer, toggleTimer, useTimer } from './widgets';
+import {
+  setWeatherPlace,
+  startClock,
+  startCountdown,
+  startGraph,
+  startMeter,
+  startPomodoro,
+  startTicker,
+  startVisualiser,
+  startWeather,
+  stopTimer,
+  tickerSymbol,
+  toggleTimer,
+  useTimer,
+} from './widgets';
 
 type PanelProps = { go: (tab: string) => void };
 
@@ -614,6 +628,116 @@ function NumberField(props: { label: string; value: number; min: number; max: nu
   );
 }
 
+/** One "show this widget" button that reads "Showing" while its widget is up. */
+function ShowButton(props: { label: string; showing: boolean; onClick: () => void; disabled?: boolean }) {
+  return (
+    <button className={props.showing ? 'ghost' : ''} onClick={props.onClick} disabled={props.disabled}>
+      {props.showing ? 'Showing' : props.label}
+    </button>
+  );
+}
+
+function TickerSection({ playing }: { playing: string | null }) {
+  const { widgets } = useBridge().settings;
+  const [symbol, setSymbol] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const parsed = tickerSymbol(symbol);
+  const save = (ticker: string[]) => updateSettings({ widgets: { ...widgets, ticker } });
+  return (
+    <Section title="Ticker">
+      <p>Prices scroll past with today's change, refreshed every minute.</p>
+      <form
+        className="row end"
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          if (!parsed) return;
+          save([...widgets.ticker.filter((s) => s !== parsed), parsed].slice(-8));
+          setSymbol('');
+        }}
+      >
+        <label className="field grow">
+          <span className="label">Symbol</span>
+          <input value={symbol} onChange={(ev) => setSymbol(ev.target.value)} placeholder="AAPL, BTC, RELIANCE.NS" spellCheck={false} />
+        </label>
+        <button type="submit" className="ghost" disabled={!parsed}>
+          Add
+        </button>
+      </form>
+      <div className="row wrap">
+        {widgets.ticker.map((s) => (
+          <button key={s} className="chip" title="Remove" onClick={() => save(widgets.ticker.filter((x) => x !== s))}>
+            {s} ×
+          </button>
+        ))}
+      </div>
+      <div className="row">
+        <ShowButton
+          label="Show ticker"
+          showing={playing === 'widget: ticker'}
+          disabled={widgets.ticker.length === 0}
+          onClick={() => void startTicker().then(setProblem)}
+        />
+      </div>
+      {problem && <p className="warn">{problem}</p>}
+      <p className="hint">Prices come from Yahoo Finance's public quote feed, which is unofficial and can be delayed. Not for trading on.</p>
+    </Section>
+  );
+}
+
+function WeatherSection({ playing }: { playing: string | null }) {
+  const { widgets } = useBridge().settings;
+  const [place, setPlace] = useState('');
+  const [fahrenheit, setFahrenheit] = useState(widgets.weather?.fahrenheit ?? false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const run = (job: () => Promise<string | null>) => {
+    setBusy(true);
+    job()
+      .then(setProblem, (err) => setProblem(err instanceof Error ? err.message : String(err)))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <Section title="Weather">
+      <p>A small picture of the sky with the temperature under it, refreshed every 15 minutes.</p>
+      <form
+        className="row end"
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          if (place.trim()) run(async () => (await setWeatherPlace(place, fahrenheit)) ?? (setPlace(''), startWeather()));
+        }}
+      >
+        <label className="field grow">
+          <span className="label">Town or city</span>
+          <input value={place} onChange={(ev) => setPlace(ev.target.value)} placeholder={widgets.weather?.place ?? 'London'} />
+        </label>
+        <button type="submit" className="ghost" disabled={busy || !place.trim()}>
+          Set place
+        </button>
+      </form>
+      <div className="row">
+        <ShowButton label="Show weather" showing={playing === 'widget: weather'} disabled={busy || !widgets.weather} onClick={() => run(startWeather)} />
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={fahrenheit}
+            onChange={(ev) => {
+              setFahrenheit(ev.target.checked);
+              if (!widgets.weather) return;
+              updateSettings({ widgets: { ...widgets, weather: { ...widgets.weather, fahrenheit: ev.target.checked } } });
+              if (playing === 'widget: weather') run(startWeather);
+            }}
+          />
+          Fahrenheit
+        </label>
+      </div>
+      {problem && <p className="warn">{problem}</p>}
+      <p className="hint">
+        {widgets.weather ? `Showing ${widgets.weather.place}. ` : ''}Weather from Open-Meteo. The town you type is sent to them to look it up.
+      </p>
+    </Section>
+  );
+}
+
 export function WidgetsPanel(_: PanelProps) {
   const bridge = useBridge();
   const timer = useTimer();
@@ -691,6 +815,20 @@ export function WidgetsPanel(_: PanelProps) {
         </button>
         {!isTauri && <p className="hint">Running in a browser, so these numbers are made up. The desktop app reads real ones.</p>}
       </Section>
+
+      <Section title="Load graph">
+        <p>CPU load over the last 25 seconds as a bar chart, newest on the right.</p>
+        <ShowButton label="Show load graph" showing={playing === 'widget: load graph'} onClick={startGraph} />
+      </Section>
+
+      <Section title="Visualiser">
+        <p>A spectrum of whatever this PC is playing: bass on the left, treble on the right, with caps that hang on the hits.</p>
+        <ShowButton label="Show visualiser" showing={playing === 'widget: visualiser'} onClick={startVisualiser} />
+        <p className="hint">It scales itself to the volume, so quiet playback still moves. The sound is analysed as it plays and never stored.</p>
+      </Section>
+
+      <TickerSection playing={playing} />
+      <WeatherSection playing={playing} />
     </>
   );
 }
@@ -814,6 +952,7 @@ export function DeveloperPanel(_: PanelProps) {
       <Section title="matrix CLI">
         <p>Any script can push to the matrix while this app is running.</p>
         <pre>{`matrix send "build passed"
+matrix progress 42 BUILD
 matrix image logo.png --invert
 matrix brightness 120
 matrix clear`}</pre>
@@ -846,6 +985,8 @@ matrix clear`}</pre>
   -d '{"text":"hello","loops":2}'
 
 POST /text        {"text": "...", "loops": 2, "speedMs": 60}
+POST /notify      {"text": "..."}             passes once, then hands the matrix back
+POST /progress    {"value": 0-100, "label": "BUILD"}   or {"done": true}, {"clear": true}
 POST /frame       {"px": [625 numbers, 0-255, row by row]}
 POST /image       body = PNG/JPEG/GIF bytes   ?invert=1&dither=1&fit=contain
 POST /brightness  {"value": 0-255}

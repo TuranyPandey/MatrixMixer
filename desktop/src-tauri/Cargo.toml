@@ -27,6 +27,8 @@ dirs = "5"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_UI_Input_KeyboardAndMouse"] }
+# Now playing (media session) and the sound level meter. Same version Tauri already brings in.
+windows = { version = "0.62", features = ["Media_Control", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_System_Com"] }
 
 [profile.release]
 strip = true

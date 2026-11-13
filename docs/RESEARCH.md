@@ -40,6 +40,15 @@ Lower priority:
 10. Face-down reminders (needs phone sensors, so it belongs in the phone app).
 11. Once stable, post in the Nothing Community toy index thread.
 
+## Built (2026-11-13)
+- Built: progress ring, on-air light, now-playing notices, visualiser, load graph, ticker (stocks and crypto), calendar notices, game HUD (Counter-Strike 2), weather face.
+- Covered by something else: the AI usage ring. There is no official usage API to read, so a script feeds the progress ring (`matrix progress 63 CLAUDE`).
+- Not built:
+  - GPU load and temperatures: `sysinfo` reports neither reliably on Windows; needs vendor tools.
+  - Stream Deck plugin: could not be tested without the hardware. A Stream Deck "Open" action running `matrix notify "text"` already works.
+  - Discord/Teams mentions: reading other apps' notifications needs a packaged Windows app with the notification-listener permission.
+  - Face-down reminders: phone app work (sensors), not started.
+
 ## Sources
 - [Luxafor + Stream Deck](https://luxafor.com/news/luxafor-integrates-with-elgato-stream-deck/)
 - [iGoX BusyLight Stream Deck plugin](https://marketplace.elgato.com/product/igox-busylight-7448a0be-6dd6-4711-ba0d-86c52b9075b9)

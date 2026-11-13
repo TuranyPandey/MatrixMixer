@@ -35,6 +35,20 @@ export type ButtonBinding = { kind: ActionKind; command: string };
 export type ConnectorSettings = {
   github: { enabled: boolean; repos: string[]; pushes: boolean; ci: boolean };
   battery: { enabled: boolean; low: number };
+  /** Ring lights up while the microphone or camera is in use. */
+  onair: { enabled: boolean; mic: boolean; camera: boolean };
+  /** A notice when a new track starts. */
+  music: { enabled: boolean };
+  /** Notices before events from a private .ics link. `lead` is minutes of warning. */
+  calendar: { enabled: boolean; url: string; lead: number };
+  /** Game HUD. `token` is what the game must send along; made once, on first use. */
+  game: { enabled: boolean; token: string };
+};
+
+export type WidgetSettings = {
+  /** Yahoo Finance symbols: AAPL, BTC-USD, RELIANCE.NS. */
+  ticker: string[];
+  weather: { place: string; latitude: number; longitude: number; fahrenheit: boolean } | null;
 };
 
 export type Settings = {
@@ -44,6 +58,11 @@ export type Settings = {
   brightness: number;
   buttons: Record<ButtonAction, ButtonBinding>;
   connectors: ConnectorSettings;
+  /** Show the floating island on the desktop. See islandHost.ts. */
+  island: boolean;
+  /** Where the island sits: 0-2 along the top (left, centre, right), 3-5 along the bottom. */
+  islandPlace: number;
+  widgets: WidgetSettings;
 };
 
 const DEFAULTS: Settings = {
@@ -59,7 +78,14 @@ const DEFAULTS: Settings = {
   connectors: {
     github: { enabled: false, repos: [], pushes: true, ci: true },
     battery: { enabled: false, low: 20 },
+    onair: { enabled: false, mic: true, camera: true },
+    music: { enabled: false },
+    calendar: { enabled: false, url: '', lead: 10 },
+    game: { enabled: false, token: '' },
   },
+  widgets: { ticker: ['BTC-USD', 'ETH-USD', 'AAPL'], weather: null },
+  island: true,
+  islandPlace: 1,
 };
 
 const KEY = 'matrix-bridge.settings';
@@ -74,7 +100,12 @@ function loadSettings(): Settings {
       connectors: {
         github: { ...DEFAULTS.connectors.github, ...saved.connectors?.github },
         battery: { ...DEFAULTS.connectors.battery, ...saved.connectors?.battery },
+        onair: { ...DEFAULTS.connectors.onair, ...saved.connectors?.onair },
+        music: { ...DEFAULTS.connectors.music, ...saved.connectors?.music },
+        calendar: { ...DEFAULTS.connectors.calendar, ...saved.connectors?.calendar },
+        game: { ...DEFAULTS.connectors.game, ...saved.connectors?.game },
       },
+      widgets: { ...DEFAULTS.widgets, ...saved.widgets },
     };
   } catch {
     return DEFAULTS;
@@ -135,6 +166,16 @@ export function useBridge(): BridgeState {
     },
     () => state,
   );
+}
+
+/** For code outside React (the island host). Returns the unsubscribe function. */
+export function subscribe(fn: () => void): () => void {
+  subscribers.add(fn);
+  return () => subscribers.delete(fn);
+}
+
+export function getState(): BridgeState {
+  return state;
 }
 
 /** For code outside React (connectors, widgets). */
@@ -248,6 +289,9 @@ export function bitmapToFrame(image: CanvasImageSource, width: number, height: n
 
 // ---- local API requests (from the CLI and scripts) ---------------------------------
 
+/** Endpoints handled elsewhere (activities.ts): path to handler, given the parsed JSON body. */
+export const apiHandlers = new Map<string, (body: Record<string, unknown>) => void>();
+
 /** Who to hand `POST /notify` texts to. Empty means "just show it". */
 export const apiNotices = new Set<(text: string) => void>();
 
@@ -296,6 +340,8 @@ async function handleApi(request: ApiRequest): Promise<void> {
       case '/brightness':
         if (typeof body.value === 'number') setBrightness(Math.max(0, Math.min(255, Math.round(body.value))));
         break;
+      default:
+        apiHandlers.get(request.path)?.(body);
     }
   } catch (err) {
     set({ error: `API request ${request.path} failed: ${err instanceof Error ? err.message : err}` });

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { ConnectionState, Frame } from '@matrix-bridge/core';
-import { clearMatrix, player, setBrightness, useBridge } from './bridge';
+import { clearMatrix, player, setBrightness, updateSettings, useBridge } from './bridge';
 import { ConnectorsPanel } from './ConnectorsPanel';
 import { DotText } from './DotText';
 import { MatrixView } from './MatrixView';
@@ -26,6 +26,9 @@ const STATUS: Record<ConnectionState, string> = {
   connected: 'Linked',
   reconnecting: 'Lost it. Redialling',
 };
+
+/** Island positions, in the order of Settings.islandPlace. */
+const PLACES = ['Top left', 'Top centre', 'Top right', 'Bottom left', 'Bottom centre', 'Bottom right'];
 
 export function App() {
   const bridge = useBridge();
@@ -93,6 +96,25 @@ export function App() {
         <button className="ghost" onClick={clearMatrix} disabled={!bridge.playing}>
           Clear matrix
         </button>
+        <label className="check island-toggle">
+          <input type="checkbox" checked={bridge.settings.island} onChange={(ev) => updateSettings({ island: ev.target.checked })} />
+          Island on the desktop
+        </label>
+        {bridge.settings.island && (
+          <div className="place" role="radiogroup" aria-label="Where the island sits on the screen">
+            {PLACES.map((name, place) => (
+              <button
+                key={name}
+                role="radio"
+                aria-checked={bridge.settings.islandPlace === place}
+                aria-label={name}
+                title={name}
+                className={bridge.settings.islandPlace === place ? 'place-spot active' : 'place-spot'}
+                onClick={() => updateSettings({ islandPlace: place })}
+              />
+            ))}
+          </div>
+        )}
       </aside>
     </div>
   );

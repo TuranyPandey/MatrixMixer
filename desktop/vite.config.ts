@@ -12,5 +12,15 @@ export default defineConfig({
   clearScreen: false,
   // Do not watch Rust's build output: cargo locks files there and the watcher crashes (EBUSY).
   server: { port: 1420, strictPort: true, watch: { ignored: ['**/src-tauri/**'] } },
-  build: { target: 'es2022', outDir: 'dist' },
+  build: {
+    target: 'es2022',
+    outDir: 'dist',
+    // Two pages: the main window and the floating island.
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('index.html', import.meta.url)),
+        island: fileURLToPath(new URL('island.html', import.meta.url)),
+      },
+    },
+  },
 });

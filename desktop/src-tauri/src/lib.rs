@@ -5,9 +5,13 @@
 mod actions;
 mod api;
 mod discovery;
+mod fetch;
 mod github;
+mod media;
+mod onair;
 mod stats;
 
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::menu::{Menu, MenuItem};
@@ -47,6 +51,30 @@ async fn github_get(path: String) -> Result<String, String> {
         .map_err(|e| e.to_string())?
 }
 
+/// The track Windows knows about, for the now-playing connector. See media.rs.
+#[tauri::command]
+async fn now_playing() -> Result<Option<media::NowPlaying>, String> {
+    tauri::async_runtime::spawn_blocking(media::now_playing).await.map_err(|e| e.to_string())?
+}
+
+/// The spectrum of what the speakers are playing, for the visualiser widget. See media.rs.
+#[tauri::command]
+fn audio_bands() -> Vec<f32> {
+    media::bands()
+}
+
+/// Whether the microphone or camera is in use, for the on-air light. See onair.rs.
+#[tauri::command]
+async fn on_air() -> Result<onair::InUse, String> {
+    tauri::async_runtime::spawn_blocking(onair::in_use).await.map_err(|e| e.to_string())
+}
+
+/// Downloads an https link as text, for the calendar and ticker. See fetch.rs.
+#[tauri::command]
+async fn fetch_text(url: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || fetch::text(&url)).await.map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 fn api_info(state: State<'_, ApiState>) -> api::ApiInfo {
     state.info.clone()
@@ -66,6 +94,88 @@ fn pc_name() -> String {
     std::env::var("COMPUTERNAME")
         .or_else(|_| std::env::var("HOSTNAME"))
         .unwrap_or_else(|_| "PC".to_string())
+}
+
+/// Island sizes in logical pixels: the resting pill and the hover panel.
+const ISLAND_COMPACT: (f64, f64) = (250.0, 42.0);
+const ISLAND_EXPANDED: (f64, f64) = (400.0, 196.0);
+/// Gap between the island and the edge of the screen, in logical pixels.
+const ISLAND_MARGIN: f64 = 8.0;
+
+/// Where the island sits: 0-2 along the top (left, centre, right), 3-5 along the bottom.
+static ISLAND_PLACE: AtomicU8 = AtomicU8::new(1);
+
+/// Sizes the island and pins it to its place on the main screen, clear of the taskbar.
+/// The hover panel grows away from the edge it is pinned to.
+fn place_island(window: &tauri::WebviewWindow, expanded: bool) {
+    let (w, h) = if expanded { ISLAND_EXPANDED } else { ISLAND_COMPACT };
+    let _ = window.set_size(tauri::LogicalSize::new(w, h));
+    if let Ok(Some(monitor)) = window.primary_monitor() {
+        let scale = monitor.scale_factor();
+        let area = monitor.work_area();
+        let (left, top) = (area.position.x as f64, area.position.y as f64);
+        let (free_w, free_h) = (area.size.width as f64 - w * scale, area.size.height as f64 - h * scale);
+        let margin = ISLAND_MARGIN * scale;
+        let place = ISLAND_PLACE.load(Ordering::SeqCst);
+        let x = match place % 3 {
+            0 => left + margin,
+            1 => left + free_w / 2.0,
+            _ => left + free_w - margin,
+        };
+        let y = if place < 3 { top + margin } else { top + free_h - margin };
+        let _ = window.set_position(tauri::PhysicalPosition::new(x.round() as i32, y.round() as i32));
+    }
+}
+
+/// Shows or hides the island. The main window calls this from its "Island on the desktop" setting.
+#[tauri::command]
+fn island_show(app: tauri::AppHandle, visible: bool, place: u8) {
+    ISLAND_PLACE.store(place.min(5), Ordering::SeqCst);
+    if let Some(window) = app.get_webview_window("island") {
+        if visible {
+            place_island(&window, false);
+            let _ = window.show();
+        } else {
+            let _ = window.hide();
+        }
+    }
+}
+
+/// True while the island's hover panel is open.
+static ISLAND_OPEN: AtomicBool = AtomicBool::new(false);
+
+/// Grows the island into its hover panel, or shrinks it back to the pill.
+#[tauri::command]
+fn island_expand(app: tauri::AppHandle, expanded: bool) {
+    let Some(window) = app.get_webview_window("island") else { return };
+    place_island(&window, expanded);
+    if ISLAND_OPEN.swap(expanded, Ordering::SeqCst) || !expanded {
+        return;
+    }
+    // The webview does not always hear the pointer leave a window this small,
+    // so while the panel is open, watch the pointer from here and tell it.
+    std::thread::spawn(move || {
+        let mut was_inside = true;
+        while ISLAND_OPEN.load(Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_millis(150));
+            let (Ok(cursor), Ok(pos), Ok(size)) = (window.cursor_position(), window.outer_position(), window.outer_size()) else {
+                continue;
+            };
+            let inside = cursor.x >= pos.x as f64
+                && cursor.y >= pos.y as f64
+                && cursor.x < pos.x as f64 + size.width as f64
+                && cursor.y < pos.y as f64 + size.height as f64;
+            if inside != was_inside {
+                was_inside = inside;
+                let _ = window.emit("island-pointer", inside);
+            }
+        }
+    });
+}
+
+#[tauri::command]
+fn show_main(app: tauri::AppHandle) {
+    show_main_window(&app);
 }
 
 fn show_main_window(app: &tauri::AppHandle) {
@@ -104,12 +214,17 @@ pub fn run() {
             // Tray icon: closing the window keeps widgets and the API running.
             let show = MenuItem::with_id(app, "show", "Open Matrix Bridge", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
+            let island = MenuItem::with_id(app, "island", "Show or hide the island", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show, &island, &quit])?;
             let mut tray = TrayIconBuilder::new()
                 .tooltip("Matrix Bridge")
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => show_main_window(app),
+                    // The setting lives in the main window, so it does the flipping.
+                    "island" => {
+                        let _ = app.emit("island-toggle", ());
+                    }
                     "quit" => app.exit(0),
                     _ => {}
                 });
@@ -133,7 +248,14 @@ pub fn run() {
             github_get,
             api_info,
             set_status,
-            pc_name
+            pc_name,
+            now_playing,
+            audio_bands,
+            on_air,
+            fetch_text,
+            island_show,
+            island_expand,
+            show_main
         ])
         .build(tauri::generate_context!())
         .expect("error while building Matrix Bridge");

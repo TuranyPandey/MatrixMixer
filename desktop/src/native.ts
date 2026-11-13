@@ -89,3 +89,30 @@ export function reportStatus(status: unknown): void {
 export function onApiRequest(handler: (request: ApiRequest) => void): void {
   if (isTauri) void listen<ApiRequest>('api-request', (event) => handler(event.payload));
 }
+
+/** The track Windows knows about (Spotify, a browser tab). Null when there is none, and always in a browser. */
+export async function nowPlaying(): Promise<{ title: string; artist: string; playing: boolean } | null> {
+  return isTauri ? invoke('now_playing') : null;
+}
+
+/** The spectrum of what the speakers are playing: 12 levels (0-1), bass first. Empty until listening has started. */
+export async function audioBands(): Promise<number[]> {
+  if (isTauri) return invoke('audio_bands');
+  // Browser stand-in: a made-up beat so the visualiser visibly works.
+  const t = Date.now() / 1000;
+  const beat = Math.pow(Math.abs(Math.sin(t * 4)), 6);
+  return Array.from({ length: 12 }, (_, i) => Math.max(0, Math.min(1, 0.45 + 0.4 * beat * Math.exp(-i / 4) + 0.25 * Math.sin(t * (1.3 + i * 0.7) + i))));
+}
+
+/** Whether the microphone or camera is in use right now. */
+export async function onAir(): Promise<{ mic: boolean; camera: boolean }> {
+  return isTauri ? invoke('on_air') : { mic: false, camera: false };
+}
+
+/** Downloads an https link as text. The desktop app can reach servers a web page is not allowed to. */
+export async function fetchText(url: string): Promise<string> {
+  if (isTauri) return invoke<string>('fetch_text', { url });
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`The server answered ${res.status}`);
+  return res.text();
+}

@@ -26,12 +26,23 @@ PC companion for the Nothing Phone (3) Glyph Matrix. Read README.md, docs/SETUP.
 - Not built yet: now-playing widget, Google Calendar widget, animation editor (.glyph format).
 
 ## Where we left off (2026-11-13) — read this first
-Work is on branch `hardware-verification` (not merged, not pushed). Next session starts from the list below.
+Everything up to 2026-11-13 evening is merged into `main` and pushed. Next session starts from the list below.
 
 Done in the last session, after the hardware run:
 - PC app redesign: page titles and logo drawn in the matrix's 5x7 dot font (`desktop/src/DotText.tsx`), status wording with some voice ("No phone on the line", "Linked"), dotted sliders, flat open sections divided by hairlines.
 - Connectors tab (`desktop/src/ConnectorsPanel.tsx`, `desktop/src/connectors.ts`): GitHub (pushes, merges, CI pass/fail, polled every 60 s via `gh api`, read-only allowlist in `desktop/src-tauri/src/github.rs`), PC battery low/full, recent notices list.
 - Notices: `Player.notify()` in `core/src/player.ts` shows a finite source (ring blinks twice, text passes once) then resumes what was playing. `noticeSource` and `githubNews` are in `core/src/connectors.ts`, with tests. Exposed as `POST /notify` and `matrix notify "text"`.
+
+- Island: a second, always-on-top Tauri window (`desktop/island.html`, `desktop/src/Island.tsx`) showing a pill at the top centre of the screen that mirrors the matrix; hovering opens quick controls. The main window owns the connection and feeds it over Tauri events (`islandHost.ts`, `islandLink.ts`); sizes, placement and the pointer watcher are in `lib.rs`. Toggle: "Island on the desktop" in the side column, or the tray menu. Placement: six spots (top/bottom x left/centre/right, `islandPlace` setting, picker under the toggle), kept clear of the taskbar; the panel holds only brightness, a text box (Enter sends), Clear, Open app and Hide. Verified on this PC: shows, expands on hover, folds back, mirrors text sent through the API. Not verified: the placement picker on screen, clicking the panel's controls, the tray toggle, the installed (non-dev) build.
+
+- Features from docs/RESEARCH.md, built 2026-11-13 (see that file's "Built" list for what was skipped and why):
+  - Frames in `core/src/faces.ts`, .ics parsing in `core/src/calendar.ts`, tests in `core/test/features.test.ts`.
+  - `desktop/src/activities.ts`: progress ring (`POST /progress`, `matrix progress 42 BUILD`), on-air light, now-playing notices, calendar notices, CS2 game HUD (`POST /game`, token in the body). All go through `player.notify`, so the previous source comes back.
+  - `desktop/src/widgets.ts`: load graph, visualiser (12-band spectrum: WASAPI loopback capture and FFT in `media.rs`, smoothing and peak caps in `spectrumSmoother`), ticker (Yahoo Finance chart endpoint, unofficial), weather (Open-Meteo).
+  - Rust: `media.rs` (media session + loopback spectrum via the `windows` crate), `onair.rs` (`reg query` on the ConsentStore), `fetch.rs` (https via `curl`).
+  - Verified on this PC: unit tests; `cargo test media -- --ignored --nocapture` (read the current track, levels, mic state, an https fetch); progress ring end to end through the running app's API; both tabs render in headless Edge.
+  - Not verified: on-air with a real call, a track-change notice, the visualiser/ticker/weather/graph buttons inside the Tauri window, the calendar with a real .ics link, the game HUD against the real game, how any of these look on the phone.
+- Gotcha: after files are rewritten by a script, Vite's dev server sometimes keeps serving a stale or empty module (window stays blank, `GET /status` says "starting"). `touch` the files in `desktop/src` to fix.
 
 Not yet verified for the above: a real push arriving as a notice in the Tauri app, battery notices firing, `matrix notify` from an installed CLI, and how notices look on the real phone.
 
@@ -42,7 +53,6 @@ User's design preferences (from feedback on the redesign):
 Next steps, in the order agreed or suggested:
 1. Clarify and fix the arrow flash on the PC Remote toy (user: "flashes too slowly", and after one long-press something "doesn't come back").
 2. Confirm the GitHub connector end to end: watch `TuranyPandey/MatrixMixer`, push, see the notice on the phone.
-3. Merge `hardware-verification` into `main` and push, once the user says so.
 4. Next features: see "Suggested next features" in docs/RESEARCH.md (progress ring, on-air light, now playing + visualiser first).
 5. Phone app has not had the redesign; offer it.
 6. Plan for the Phone (4a) Pro's 13x13 matrix: everything assumes 25x25.

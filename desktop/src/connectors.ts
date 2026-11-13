@@ -45,10 +45,14 @@ export function notify(from: string, text: string): void {
   publish({ recent: [{ from, text, at: Date.now() }, ...state.recent].slice(0, 6) });
 }
 
+/** Run after connector settings change. activities.ts adds its own here. */
+export const afterConnectorChange = new Set<() => void>();
+
 /** Changes connector settings and applies them straight away. */
 export function updateConnectors(patch: Partial<ConnectorSettings>): void {
   updateSettings({ connectors: { ...getSettings().connectors, ...patch } });
   sync();
+  afterConnectorChange.forEach((fn) => fn());
 }
 
 // ---- GitHub -----------------------------------------------------------------------

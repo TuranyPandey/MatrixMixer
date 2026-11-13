@@ -15,12 +15,14 @@ use tiny_http::{Header, Method, Response, Server};
 pub const DEFAULT_PORT: u16 = 8766;
 /// Largest request body accepted. A frame is ~2.5 KB; images can be bigger.
 const MAX_BODY: u64 = 8 * 1024 * 1024;
+/// Game state updates are a few KB of JSON.
+const MAX_GAME_BODY: u64 = 256 * 1024;
 
 /// One accepted request, as handed to the window.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiRequest {
-    /// `/text`, `/notify`, `/frame`, `/image`, `/clear` or `/brightness`.
+    /// `/text`, `/notify`, `/progress`, `/frame`, `/image`, `/clear`, `/brightness` or `/game`.
     pub path: String,
     /// Raw query string without the `?`, e.g. `invert=1`.
     pub query: String,
@@ -91,6 +93,20 @@ pub fn start(
                 let _ = request.respond(json(403, r#"{"ok":false,"error":"Browser requests are not accepted"}"#));
                 continue;
             }
+            // Games post their state without headers we control (Counter-Strike puts its
+            // token inside the JSON). Hand those to the window, which checks that token.
+            if request.method() == &Method::Post && request.url() == "/game" {
+                let mut bytes = Vec::new();
+                let read = request.as_reader().take(MAX_GAME_BODY + 1).read_to_end(&mut bytes).is_ok();
+                let body = String::from_utf8(bytes).unwrap_or_default();
+                if read && body.len() as u64 <= MAX_GAME_BODY && serde_json::from_str::<serde_json::Value>(&body).is_ok() {
+                    on_request(ApiRequest { path: "/game".into(), query: String::new(), body, body_base64: String::new() });
+                    let _ = request.respond(json(200, r#"{"ok":true}"#));
+                } else {
+                    let _ = request.respond(json(400, r#"{"ok":false,"error":"Body is not valid JSON"}"#));
+                }
+                continue;
+            }
             if !authorised {
                 let _ = request.respond(json(401, r#"{"ok":false,"error":"Missing or wrong token"}"#));
                 continue;
@@ -105,7 +121,7 @@ pub fn start(
                 let _ = request.respond(json(200, &body));
                 continue;
             }
-            let known = matches!(path, "/text" | "/notify" | "/frame" | "/image" | "/clear" | "/brightness");
+            let known = matches!(path, "/text" | "/notify" | "/progress" | "/frame" | "/image" | "/clear" | "/brightness");
             if method != Method::Post || !known {
                 let _ = request.respond(json(404, r#"{"ok":false,"error":"Unknown endpoint"}"#));
                 continue;

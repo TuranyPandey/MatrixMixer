@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the main window may do: core Tauri APIs and outgoing WebSocket connections to the phone.",
-  "windows": ["main"],
+  "description": "What the windows may do: core Tauri APIs (the island talks to the main window over events) and outgoing WebSocket connections to the phone.",
+  "windows": ["main", "island"],
   "permissions": ["core:default", "websocket:default"]
 }

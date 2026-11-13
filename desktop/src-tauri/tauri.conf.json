@@ -18,6 +18,21 @@
         "height": 700,
         "minWidth": 860,
         "minHeight": 600
+      },
+      {
+        "label": "island",
+        "url": "island.html",
+        "title": "Matrix Bridge island",
+        "width": 250,
+        "height": 42,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "visible": false,
+        "focus": false
       }
     ],
     "security": {

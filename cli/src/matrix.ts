@@ -23,6 +23,7 @@ const HELP = `matrix - push things to your Phone (3) Glyph Matrix
 Usage
   matrix send <text> [--loops n | --forever] [--speed ms]   scroll text
   matrix notify <text>            blink, pass once, then give the matrix back
+  matrix progress <0-100> [label] fill the ring as a job runs; 100 or "done" finishes it
   matrix image <file.png|jpg> [--invert] [--dither] [--contain] [--hold sec]
   matrix frame <file.json | ->                              625 values, 0-255
   matrix brightness <0-255>
@@ -194,6 +195,20 @@ async function cmdNotify(args: Args): Promise<void> {
   await playDirect(args, noticeSource(text), 'done');
 }
 
+async function cmdProgress(args: Args): Promise<void> {
+  const what = args.positional[1];
+  const label = args.positional.slice(2).join(' ');
+  const value = Number(what);
+  let json: Record<string, unknown>;
+  if (what === 'done') json = { done: true, label };
+  else if (what === 'clear') json = { clear: true };
+  else if (what !== undefined && what !== '' && Number.isFinite(value) && value >= 0 && value <= 100) json = { value, label };
+  else fail('Usage: matrix progress <0-100> [label]   |   matrix progress done [label]   |   matrix progress clear');
+  // The ring is kept by the desktop app between calls, so there is no direct-to-phone version.
+  const api = readApiInfo();
+  if (!api || !(await viaApp(api, '/progress', { json }))) fail('"matrix progress" needs the Matrix Bridge desktop app to be running.');
+}
+
 async function cmdImage(args: Args): Promise<void> {
   const file = args.positional[1];
   if (!file) fail('Which file? Try: matrix image logo.png');
@@ -321,6 +336,8 @@ async function main(): Promise<void> {
     case 'send':
     case 'text':
       return cmdSend(args);
+    case 'progress':
+      return cmdProgress(args);
     case 'notify':
       return cmdNotify(args);
     case 'image':
