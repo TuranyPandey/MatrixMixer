@@ -323,6 +323,11 @@ function advance(): void {
   });
 }
 
+/** Puts the timer on the matrix. It keeps counting whether it is on show or not. */
+export function showTimer(): void {
+  if (timer) show();
+}
+
 function show(): void {
   if (player.label !== LABEL) void player.play(liveSource(LABEL, 250, render));
 }

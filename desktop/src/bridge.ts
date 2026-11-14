@@ -49,6 +49,8 @@ export type WidgetSettings = {
   /** Yahoo Finance symbols: AAPL, BTC-USD, RELIANCE.NS. */
   ticker: string[];
   weather: { place: string; latitude: number; longitude: number; fahrenheit: boolean } | null;
+  /** Clock widget: 12-hour instead of 24-hour. */
+  hour12: boolean;
 };
 
 export type Settings = {
@@ -63,6 +65,10 @@ export type Settings = {
   /** Where the island sits: 0-2 along the top (left, centre, right), 3-5 along the bottom. */
   islandPlace: number;
   widgets: WidgetSettings;
+  /** A patch of dot matrix that follows the pointer around the main window. */
+  cursorDots: boolean;
+  /** Its radius in pixels. */
+  cursorRadius: number;
 };
 
 const DEFAULTS: Settings = {
@@ -83,7 +89,9 @@ const DEFAULTS: Settings = {
     calendar: { enabled: false, url: '', lead: 10 },
     game: { enabled: false, token: '' },
   },
-  widgets: { ticker: ['BTC-USD', 'ETH-USD', 'AAPL'], weather: null },
+  widgets: { ticker: ['BTC-USD', 'ETH-USD', 'AAPL'], weather: null, hour12: false },
+  cursorDots: true,
+  cursorRadius: 110,
   island: true,
   islandPlace: 1,
 };

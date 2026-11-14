@@ -32,6 +32,17 @@ input, textarea, pre, code, .mono { user-select: text; }
 .dot-text { display: block; max-width: 100%; }
 .app { display: flex; flex-direction: column; height: 100%; }
 
+/* The dots under the pointer (CursorDots.tsx): a window-wide dot grid, masked to a circle that follows the pointer. */
+.cursor-dots {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 0.25s;
+  background: radial-gradient(circle, #5c5c5c 1.4px, transparent 1.9px) 0 0 / 11px 11px;
+  -webkit-mask-image: radial-gradient(circle var(--r, 110px) at var(--mx, -999px) var(--my, -999px), #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
+  mask-image: radial-gradient(circle var(--r, 110px) at var(--mx, -999px) var(--my, -999px), #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
+}
+.cursor-dots.lit { opacity: 1; }
+.app > :not(.cursor-dots) { position: relative; z-index: 1; }
+.radius-field { max-width: 320px; margin-top: 14px; }
+
 /* ---- top bar: logo, phone status, Settings ---- */
 .topbar { display: flex; align-items: center; gap: 14px; height: 58px; flex: none; padding: 0 22px; border-bottom: 1px solid var(--line); }
 button.brand { display: flex; flex-direction: column; gap: 4px; background: none; border: 0; border-radius: 6px; padding: 4px; }
@@ -204,8 +215,8 @@ code.token { margin: 0; flex: 1; white-space: nowrap; }
 .toolbar { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 6px; }
 .toolbar .segmented { margin-bottom: 0; }
 .stage { display: flex; justify-content: center; margin-bottom: 14px; }
-.draw { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
-.tools { flex: 1; min-width: 190px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.draw { display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap; }
+.tools { flex: 1; min-width: 220px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding-top: 10px; }
 .tools .segmented, .tools .field { margin-bottom: 0; }
 .tools .field { width: 100%; }
 
@@ -311,3 +322,29 @@ button.place-spot.active, button.place-spot.active:hover { background: var(--acc
 button.inline { background: none; border: 0; padding: 0; color: var(--text); font: inherit; text-decoration: underline; text-underline-offset: 3px; }
 button.inline:hover:not(:disabled) { background: none; color: #fff; }
 button.inline:active:not(:disabled) { transform: none; }
+
+.tools .label { margin-bottom: -4px; }
+.tool-actions { margin: 4px 0 0; }
+.save { width: 100%; border-top: 1px solid var(--line); padding-top: 14px; margin-top: 6px; display: flex; flex-direction: column; gap: 10px; }
+.save .row { margin: 0; }
+.drop:only-child, .drop.empty { justify-content: center; padding: 44px 18px; }
+
+/* Widgets mode: a shelf of small live matrices, then the picked one's options. */
+.shelf { display: flex; justify-content: space-between; gap: 4px; margin-bottom: 22px; }
+button.shelf-item {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; min-width: 0;
+  background: none; border: 0; border-radius: 14px; padding: 8px 0 10px; color: var(--muted);
+  font: 500 10.5px var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
+}
+button.shelf-item:hover:not(:disabled) { background: none; color: var(--text); }
+button.shelf-item:active:not(:disabled) { transform: none; }
+.shelf-item .matrix { margin: 6px; box-shadow: 0 0 0 1px var(--line-strong); transition: box-shadow 0.15s; }
+.shelf-item:hover .matrix { box-shadow: 0 0 0 1px var(--muted); }
+.shelf-item.picked { color: var(--text); }
+.shelf-item.picked .matrix { box-shadow: 0 0 0 1px var(--text); }
+/* Red ring: this one is on the real matrix. */
+.shelf-item.on .matrix { box-shadow: 0 0 0 1px #000, 0 0 0 3px var(--accent); }
+.shelf-item.on .shelf-name { color: var(--accent); }
+.widget-detail .card-head { margin-bottom: 10px; min-height: 38px; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0 36px; margin-top: 6px; }
+.pair .row { margin: 0; }

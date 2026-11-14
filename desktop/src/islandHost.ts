@@ -103,7 +103,7 @@ export function startIslandHost(): void {
         if (message.text.trim()) void player.play(textSource(message.text.trim(), { loops: 1, hold: true, speedMs: 60 }));
         break;
       case 'widget':
-        void toggleWidget(message.name).catch(() => {});
+        void toggleWidget(message.name, { hour12: getState().settings.widgets.hour12 }).catch(() => {});
         break;
       case 'watch':
         watch(message.on);

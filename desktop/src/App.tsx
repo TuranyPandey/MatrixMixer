@@ -8,6 +8,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { ConnectionState, Frame } from '@matrix-bridge/core';
 import { clearError, clearMatrix, player, setBrightness, updateSettings, useBridge } from './bridge';
 import { ConnectorsPanel } from './ConnectorsPanel';
+import { CursorDots } from './CursorDots';
 import { DotText } from './DotText';
 import { MatrixView } from './MatrixView';
 import { isTauri } from './native';
@@ -20,8 +21,8 @@ import {
   PageTitle,
   ShowTitles,
   TextPanel,
-  WidgetsPanel,
 } from './panels';
+import { WidgetsPanel } from './WidgetsPanel';
 import { describeShowing } from './showing';
 
 const MODES = [
@@ -69,6 +70,7 @@ export function App() {
 
   return (
     <div className="app">
+      {bridge.settings.cursorDots && <CursorDots radius={bridge.settings.cursorRadius} />}
       <header className="topbar">
         <button className="brand" aria-label="MatrixMixer, back to the matrix" onClick={() => setSetting(null)}>
           <DotText text="Matrix" cell={2.5} />
@@ -222,6 +224,27 @@ function DesktopPanel(_: { go: (id: string) => void }) {
               ))}
             </div>
           </>
+        )}
+      </section>
+      <section className="card">
+        <h2>Pointer</h2>
+        <p>A patch of dot matrix lights up under the pointer as it moves around this window.</p>
+        <label className="check">
+          <input type="checkbox" checked={bridge.settings.cursorDots} onChange={(ev) => updateSettings({ cursorDots: ev.target.checked })} />
+          Light the dots under the pointer
+        </label>
+        {bridge.settings.cursorDots && (
+          <label className="field radius-field">
+            <span className="label">Radius: {bridge.settings.cursorRadius} px</span>
+            <input
+              type="range"
+              min={40}
+              max={320}
+              step={10}
+              value={bridge.settings.cursorRadius}
+              onChange={(ev) => updateSettings({ cursorRadius: Number(ev.target.value) })}
+            />
+          </label>
         )}
       </section>
       <section className="card">

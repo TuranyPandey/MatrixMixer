@@ -8,7 +8,6 @@ import {
   animationSource,
   applyMask,
   blankFrame,
-  formatDuration,
   textSource,
   type ButtonAction,
   type Frame,
@@ -16,7 +15,6 @@ import {
 } from '@matrix-bridge/core';
 import {
   bitmapToFrame,
-  clearMatrix,
   connect,
   disconnect,
   forgetPhone,
@@ -29,21 +27,6 @@ import {
 import { DotText } from './DotText';
 import { MatrixView } from './MatrixView';
 import { apiInfo, discoverPhones, isTauri, runAction, type ApiInfo, type FoundPhone } from './native';
-import {
-  setWeatherPlace,
-  startClock,
-  startCountdown,
-  startGraph,
-  startMeter,
-  startPomodoro,
-  startTicker,
-  startVisualiser,
-  startWeather,
-  stopTimer,
-  tickerSymbol,
-  toggleTimer,
-  useTimer,
-} from './widgets';
 
 type PanelProps = { go: (tab: string) => void };
 
@@ -63,7 +46,7 @@ export function PageTitle({ title, lede }: { title: string; lede: string }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+export function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="card">
       <h2>{title}</h2>
@@ -361,73 +344,74 @@ export function DrawPanel(_: PanelProps) {
     <>
       <PageTitle title="Draw" lede={`${LED_COUNT} LEDs and a mouse. Make them count.`} />
       <Section title="Pixel editor">
-        <div className="toolbar">
-          <div className="segmented" role="group" aria-label="Brush">
-            {BRUSHES.map((b) => (
-              <button key={b.label} className={brush === b.value ? 'on' : ''} onClick={() => setBrush(b.value)}>
-                {b.label}
+        <div className="draw">
+          <MatrixView frame={frame} size={320} onPaint={paint} label="Drawing canvas, 25 by 25 dots" />
+          <div className="tools">
+            <span className="label">Brush</span>
+            <div className="segmented" role="group" aria-label="Brush">
+              {BRUSHES.map((b) => (
+                <button key={b.label} className={brush === b.value ? 'on' : ''} onClick={() => setBrush(b.value)}>
+                  {b.label}
+                </button>
+              ))}
+            </div>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={live}
+                onChange={(ev) => {
+                  setLive(ev.target.checked);
+                  if (ev.target.checked) player.show(frame, 'drawing');
+                }}
+              />
+              Show on the matrix as I draw
+            </label>
+            {!live && <button onClick={() => player.show(frame, 'drawing')}>Send to matrix</button>}
+            <div className="row wrap tool-actions">
+              <button className="ghost" disabled={empty} onClick={() => apply(applyMask(frame.map((v) => 255 - v)))}>
+                Invert
               </button>
-            ))}
-          </div>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={live}
-              onChange={(ev) => {
-                setLive(ev.target.checked);
-                if (ev.target.checked) player.show(frame, 'drawing');
+              <button className="ghost" disabled={empty} onClick={() => apply(blankFrame())}>
+                Clear
+              </button>
+              <button
+                className="ghost"
+                disabled={empty}
+                title='Works with "matrix frame"'
+                onClick={() => {
+                  void navigator.clipboard?.writeText(JSON.stringify(Array.from(frame))).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  });
+                }}
+              >
+                {copied ? 'Copied' : 'Copy JSON'}
+              </button>
+            </div>
+            <form
+              className="save"
+              onSubmit={(ev) => {
+                ev.preventDefault();
+                const clean = name.trim();
+                if (!clean || empty) return;
+                persist([{ name: clean, px: Array.from(frame) }, ...drawings.filter((d) => d.name !== clean)]);
+                setName('');
               }}
-            />
-            Show on the matrix as I draw
-          </label>
-        </div>
-        <div className="stage">
-          <MatrixView frame={frame} size={340} onPaint={paint} label="Drawing canvas, 25 by 25 dots" />
-        </div>
-        <div className="row wrap">
-          {!live && <button onClick={() => player.show(frame, 'drawing')}>Send to matrix</button>}
-          <button className="ghost" disabled={empty} onClick={() => apply(applyMask(frame.map((v) => 255 - v)))}>
-            Invert
-          </button>
-          <button className="ghost" disabled={empty} onClick={() => apply(blankFrame())}>
-            Clear drawing
-          </button>
-          <button
-            className="ghost"
-            disabled={empty}
-            title='Works with "matrix frame"'
-            onClick={() => {
-              void navigator.clipboard?.writeText(JSON.stringify(Array.from(frame))).then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              });
-            }}
-          >
-            {copied ? 'Copied' : 'Copy as JSON'}
-          </button>
+            >
+              <span className="label">Keep it</span>
+              <div className="row">
+                <input aria-label="Name for this drawing" value={name} onChange={(ev) => setName(ev.target.value)} maxLength={40} placeholder="Name it" />
+                <button type="submit" className="ghost" disabled={!name.trim() || empty}>
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </Section>
       <Section title="Saved drawings">
-        <form
-          className="row end"
-          onSubmit={(ev) => {
-            ev.preventDefault();
-            const clean = name.trim();
-            if (!clean || empty) return;
-            persist([{ name: clean, px: Array.from(frame) }, ...drawings.filter((d) => d.name !== clean)]);
-            setName('');
-          }}
-        >
-          <label className="field grow">
-            <span className="label">Name</span>
-            <input value={name} onChange={(ev) => setName(ev.target.value)} maxLength={40} placeholder="Smiley" />
-          </label>
-          <button type="submit" disabled={!name.trim() || empty}>
-            Save drawing
-          </button>
-        </form>
         {drawings.length === 0 ? (
-          <p className="muted">Nothing saved yet. Draw something, give it a name and save it.</p>
+          <p className="muted">Nothing saved yet. Draw something, name it and save it.</p>
         ) : (
           <div className="gallery">
             {drawings.map((d) => (
@@ -544,7 +528,7 @@ export function ImagePanel(_: PanelProps) {
       <PageTitle title="Image" lede="Any picture or GIF, squashed down to 25 by 25." />
       <Section title="Picture or GIF">
         <div
-          className={dragging ? 'drop over' : 'drop'}
+          className={`drop${dragging ? ' over' : ''}${decoded ? '' : ' empty'}`}
           onDragOver={(ev) => {
             ev.preventDefault();
             setDragging(true);
@@ -610,231 +594,6 @@ export function ImagePanel(_: PanelProps) {
           </div>
         )}
       </Section>
-    </>
-  );
-}
-
-// ---- Widgets ----------------------------------------------------------------------
-
-function NumberField(props: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
-  return (
-    <label className="field">
-      <span className="label">{props.label}</span>
-      <input
-        className="short"
-        type="number"
-        min={props.min}
-        max={props.max}
-        value={props.value}
-        onChange={(ev) => props.onChange(Math.max(props.min, Math.min(props.max, Math.round(Number(ev.target.value)) || props.min)))}
-      />
-    </label>
-  );
-}
-
-/** One "show this widget" button. While its widget is up it reads "Showing", and clicking it takes the widget off. */
-function ShowButton(props: { label: string; showing: boolean; onClick: () => void; disabled?: boolean }) {
-  return (
-    <button
-      className={props.showing ? 'ghost' : ''}
-      aria-pressed={props.showing}
-      title={props.showing ? 'Click to take it off the matrix' : undefined}
-      onClick={props.showing ? clearMatrix : props.onClick}
-      disabled={props.disabled && !props.showing}
-    >
-      {props.showing ? 'Showing' : props.label}
-    </button>
-  );
-}
-
-function TickerSection({ playing }: { playing: string | null }) {
-  const { widgets } = useBridge().settings;
-  const [symbol, setSymbol] = useState('');
-  const [problem, setProblem] = useState<string | null>(null);
-  const parsed = tickerSymbol(symbol);
-  const save = (ticker: string[]) => updateSettings({ widgets: { ...widgets, ticker } });
-  return (
-    <Section title="Ticker">
-      <p>Prices scroll past with today's change, refreshed every minute.</p>
-      <form
-        className="row end"
-        onSubmit={(ev) => {
-          ev.preventDefault();
-          if (!parsed) return;
-          save([...widgets.ticker.filter((s) => s !== parsed), parsed].slice(-8));
-          setSymbol('');
-        }}
-      >
-        <label className="field grow">
-          <span className="label">Symbol</span>
-          <input value={symbol} onChange={(ev) => setSymbol(ev.target.value)} placeholder="AAPL, BTC, RELIANCE.NS" spellCheck={false} />
-        </label>
-        <button type="submit" className="ghost" disabled={!parsed}>
-          Add
-        </button>
-      </form>
-      <div className="row wrap">
-        {widgets.ticker.map((s) => (
-          <button key={s} className="chip" title="Remove" onClick={() => save(widgets.ticker.filter((x) => x !== s))}>
-            {s} ×
-          </button>
-        ))}
-      </div>
-      <div className="row">
-        <ShowButton
-          label="Show ticker"
-          showing={playing === 'widget: ticker'}
-          disabled={widgets.ticker.length === 0}
-          onClick={() => void startTicker().then(setProblem)}
-        />
-      </div>
-      {problem && <p className="warn">{problem}</p>}
-      <p className="hint">Prices come from Yahoo Finance's public quote feed, which is unofficial and can be delayed. Not for trading on.</p>
-    </Section>
-  );
-}
-
-function WeatherSection({ playing }: { playing: string | null }) {
-  const { widgets } = useBridge().settings;
-  const [place, setPlace] = useState('');
-  const [fahrenheit, setFahrenheit] = useState(widgets.weather?.fahrenheit ?? false);
-  const [problem, setProblem] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const run = (job: () => Promise<string | null>) => {
-    setBusy(true);
-    job()
-      .then(setProblem, (err) => setProblem(err instanceof Error ? err.message : String(err)))
-      .finally(() => setBusy(false));
-  };
-  return (
-    <Section title="Weather">
-      <p>A small picture of the sky with the temperature under it, refreshed every 15 minutes.</p>
-      <form
-        className="row end"
-        onSubmit={(ev) => {
-          ev.preventDefault();
-          if (place.trim()) run(async () => (await setWeatherPlace(place, fahrenheit)) ?? (setPlace(''), startWeather()));
-        }}
-      >
-        <label className="field grow">
-          <span className="label">Town or city</span>
-          <input value={place} onChange={(ev) => setPlace(ev.target.value)} placeholder={widgets.weather?.place ?? 'London'} />
-        </label>
-        <button type="submit" className="ghost" disabled={busy || !place.trim()}>
-          Set place
-        </button>
-      </form>
-      <div className="row">
-        <ShowButton label="Show weather" showing={playing === 'widget: weather'} disabled={busy || !widgets.weather} onClick={() => run(startWeather)} />
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={fahrenheit}
-            onChange={(ev) => {
-              setFahrenheit(ev.target.checked);
-              if (!widgets.weather) return;
-              updateSettings({ widgets: { ...widgets, weather: { ...widgets.weather, fahrenheit: ev.target.checked } } });
-              if (playing === 'widget: weather') run(startWeather);
-            }}
-          />
-          Fahrenheit
-        </label>
-      </div>
-      {problem && <p className="warn">{problem}</p>}
-      <p className="hint">
-        {widgets.weather ? `Showing ${widgets.weather.place}. ` : ''}Weather from Open-Meteo. The town you type is sent to them to look it up.
-      </p>
-    </Section>
-  );
-}
-
-export function WidgetsPanel(_: PanelProps) {
-  const bridge = useBridge();
-  const timer = useTimer();
-  const [focus, setFocus] = useState(25);
-  const [rest, setRest] = useState(5);
-  const [minutes, setMinutes] = useState(10);
-  const [hour12, setHour12] = useState(false);
-  const playing = bridge.playing;
-
-  return (
-    <>
-      <PageTitle title="Widgets" lede="Small things worth a glance at the back of your phone." />
-      <p className="muted">One widget runs at a time. Starting another replaces it; clicking the one that is showing takes it off.</p>
-
-      <Section title="Timer">
-        {timer ? (
-          <>
-            <p className="big mono">{formatDuration(timer.remaining)}</p>
-            <p className="muted">
-              {timer.phase === 'done'
-                ? "Time's up."
-                : timer.kind === 'countdown'
-                  ? 'Countdown'
-                  : `${timer.phase === 'focus' ? 'Focus' : 'Break'} · ${timer.rounds} focus ${timer.rounds === 1 ? 'session' : 'sessions'} done`}
-              {!timer.running && timer.phase !== 'done' ? ' · paused' : ''}
-            </p>
-            <div className="row">
-              {timer.phase !== 'done' && <button onClick={toggleTimer}>{timer.running ? 'Pause' : 'Resume'}</button>}
-              <button className="ghost" onClick={stopTimer}>
-                {timer.phase === 'done' ? 'Dismiss' : 'Stop timer'}
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="row end">
-              <NumberField label="Focus (min)" value={focus} min={1} max={180} onChange={setFocus} />
-              <NumberField label="Break (min)" value={rest} min={1} max={60} onChange={setRest} />
-              <button onClick={() => startPomodoro(focus, rest)}>Start Pomodoro</button>
-            </div>
-            <div className="row end">
-              <NumberField label="Minutes" value={minutes} min={1} max={600} onChange={setMinutes} />
-              <button className="ghost" onClick={() => startCountdown(minutes)}>
-                Start countdown
-              </button>
-            </div>
-            <p className="hint">The ring drains as time runs out. Break time is shown dimmer than focus time.</p>
-          </>
-        )}
-      </Section>
-
-      <Section title="Clock">
-        <div className="row">
-          <ShowButton label="Show clock" showing={playing === 'widget: clock'} onClick={() => startClock(hour12)} />
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={hour12}
-              onChange={(ev) => {
-                setHour12(ev.target.checked);
-                if (playing === 'widget: clock') startClock(ev.target.checked);
-              }}
-            />
-            12-hour
-          </label>
-        </div>
-      </Section>
-
-      <Section title="System meter">
-        <p>Ring and number show CPU load. The bar underneath shows memory in use.</p>
-        <ShowButton label="Show system meter" showing={playing === 'widget: system meter'} onClick={startMeter} />
-        {!isTauri && <p className="hint">Running in a browser, so these numbers are made up. The desktop app reads real ones.</p>}
-      </Section>
-
-      <Section title="Load graph">
-        <p>CPU load over the last 25 seconds as a bar chart, newest on the right.</p>
-        <ShowButton label="Show load graph" showing={playing === 'widget: load graph'} onClick={startGraph} />
-      </Section>
-
-      <Section title="Visualiser">
-        <p>A spectrum of whatever this PC is playing: bass on the left, treble on the right, with caps that hang on the hits.</p>
-        <ShowButton label="Show visualiser" showing={playing === 'widget: visualiser'} onClick={startVisualiser} />
-        <p className="hint">It scales itself to the volume, so quiet playback still moves. The sound is analysed as it plays and never stored.</p>
-      </Section>
-
-      <TickerSection playing={playing} />
-      <WeatherSection playing={playing} />
     </>
   );
 }
