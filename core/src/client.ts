@@ -104,6 +104,8 @@ export class MatrixClient {
   private frameTimer: ReturnType<typeof setTimeout> | null = null;
   private lastFrameAt = 0;
   private brightness: number | null = null;
+  /** A `pair` was sent and the phone has not answered yet. */
+  private pairSent = false;
 
   constructor(options: ClientOptions) {
     this.opts = {
@@ -153,9 +155,17 @@ export class MatrixClient {
     this.setState('offline');
   }
 
-  /** Sends the 6-digit code shown on the phone. Result arrives as `paired` or `error`. */
+  /** True between `pair()` and the phone's answer. */
+  get pairing(): boolean {
+    return this.pairSent;
+  }
+
+  /** Sends the 6-digit code shown on the phone. Result arrives as `paired` or `error`. Ignored while an attempt is pending. */
   pair(code: string): void {
-    if (this.state !== 'pairing') return;
+    // One attempt at a time: a code works once, so a second copy sent before the
+    // answer would come back as bad_code after the first one had already paired.
+    if (this.state !== 'pairing' || this.pairSent) return;
+    this.pairSent = true;
     this.sendRaw({ t: 'pair', code: code.trim(), name: this.opts.name });
   }
 
@@ -245,6 +255,7 @@ export class MatrixClient {
         else this.setState('pairing');
         break;
       case 'paired':
+        this.pairSent = false;
         this.opts.token = msg.token;
         this.emit('paired', msg.token);
         break;
@@ -256,6 +267,7 @@ export class MatrixClient {
         if (this.pending) this.sendFrame(this.pending);
         break;
       case 'error':
+        if (msg.code === 'bad_code' || msg.code === 'locked') this.pairSent = false;
         if (msg.code === 'bad_token') {
           // The phone forgot us (app data cleared, or unpaired there). Pair again.
           this.opts.token = null;
@@ -290,6 +302,7 @@ export class MatrixClient {
 
   private teardown(): void {
     this.generation++;
+    this.pairSent = false;
     if (this.retryTimer) clearTimeout(this.retryTimer);
     if (this.pingTimer) clearInterval(this.pingTimer);
     if (this.frameTimer) clearTimeout(this.frameTimer);

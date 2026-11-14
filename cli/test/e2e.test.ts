@@ -32,6 +32,25 @@ const waitFor = async (check: () => boolean, ms = 2000) => {
 };
 
 describe('PC <-> phone over a real socket', () => {
+  it('a second pair sent before the answer does not come back as an error', async () => {
+    // Pressing Pair twice used to spend the code on the first attempt, so the
+    // second one came back as bad_code after the link was already up.
+    sim = await startSimulator({ port: 0 }); // random code that rotates, like the phone
+    const a = client(sim.port);
+    const errors: string[] = [];
+    a.on('error', (code) => errors.push(code));
+    a.connect();
+    await until(a, 'pairing');
+    const code = sim.code;
+    a.pair(code);
+    expect(a.pairing).toBe(true);
+    a.pair(code);
+    await until(a, 'connected');
+    await new Promise((r) => setTimeout(r, 200));
+    expect(errors).toEqual([]);
+    expect(a.pairing).toBe(false);
+  });
+
   it('pairs, sends frames, and reconnects with the token', async () => {
     sim = await startSimulator({ port: 0, code: '123456' });
     const a = client(sim.port);
@@ -93,7 +112,12 @@ describe('PC <-> phone over a real socket', () => {
     c.on('error', (code) => errors.push(code));
     c.connect();
     await until(c, 'pairing');
-    for (let i = 0; i < 6; i++) c.pair('999999');
+    // One attempt at a time, as the app does: wait for each answer.
+    for (let i = 0; i < 6; i++) {
+      const seen = errors.length;
+      c.pair('999999');
+      await waitFor(() => errors.length > seen);
+    }
     await waitFor(() => errors.includes('locked'));
     c.pair('123456');
     await waitFor(() => errors.filter((e) => e === 'locked').length >= 2);

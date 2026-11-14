@@ -129,6 +129,8 @@ export type BridgeState = {
   toyActive: boolean;
   /** Last problem worth showing, in plain words. Cleared on the next success. */
   error: string | null;
+  /** A pairing code was sent and the phone has not answered yet. */
+  pairPending: boolean;
   /** What is on the matrix right now, e.g. "text: hello". Null when blank. */
   playing: string | null;
   lastButton: { action: ButtonAction; at: number; result: string } | null;
@@ -140,6 +142,7 @@ let state: BridgeState = {
   phoneName: null,
   toyActive: false,
   error: null,
+  pairPending: false,
   playing: null,
   lastButton: null,
 };
@@ -211,15 +214,19 @@ export async function connect(host: string, port: number): Promise<void> {
   client = c;
   c.on('state', (connection) => {
     if (client !== c) return;
-    set({ connection, phoneName: c.phoneName, ...(connection === 'connected' ? { error: null } : {}) });
+    set({ connection, phoneName: c.phoneName, pairPending: c.pairing, ...(connection === 'connected' ? { error: null } : {}) });
     // Whatever is playing shows up straight away after a (re)connect.
     if (connection === 'connected') c.sendFrame(player.current);
   });
   c.on('paired', (token) => updateSettings({ token }));
   c.on('toy', (toyActive) => set({ toyActive }));
   c.on('error', (code, message) => {
+    // A client that was replaced may still be closing; what it hears is no longer news.
+    if (client !== c) return;
     if (code === 'bad_token') updateSettings({ token: null });
-    set({ error: ERROR_TEXT[code] ?? message });
+    // Pairing errors only mean something while pairing. Once linked they are stale.
+    if ((code === 'bad_code' || code === 'locked') && c.state !== 'pairing') return;
+    set({ error: ERROR_TEXT[code] ?? message, pairPending: c.pairing });
   });
   c.on('button', (action) => void handleButton(action));
   c.setBrightness(state.settings.brightness);
@@ -233,9 +240,14 @@ export function disconnect(): void {
   set({ connection: 'offline', toyActive: false });
 }
 
-export function pair(code: string): void {
+export function clearError(): void {
   set({ error: null });
-  client?.pair(code);
+}
+
+export function pair(code: string): void {
+  if (!client || client.pairing) return;
+  client.pair(code);
+  set({ error: null, pairPending: client.pairing });
 }
 
 /** Forget the pairing on this PC. The phone keeps its side until "Forget" is tapped there. */

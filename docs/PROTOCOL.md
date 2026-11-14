@@ -70,6 +70,7 @@ Error codes: `bad_code` (wrong pairing code), `locked` (5 wrong codes; pairing r
 ## Rules worth knowing
 
 - A pairing code works once. After a successful pairing the phone shows a new one.
+- `pair` on a connection that has already paired or authenticated is ignored. The PC sends one `pair` at a time and waits for `paired` or an error before sending another.
 - Tokens never expire. The phone forgets one when the user taps **Forget** next to that PC.
 - When the last PC disconnects the phone keeps the current frame for 30 seconds, then blanks the matrix.
 - Several PCs may be connected at once. The newest frame wins.

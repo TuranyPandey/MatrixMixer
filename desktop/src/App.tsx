@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { ConnectionState, Frame } from '@matrix-bridge/core';
-import { clearMatrix, player, setBrightness, updateSettings, useBridge } from './bridge';
+import { clearError, clearMatrix, player, setBrightness, updateSettings, useBridge } from './bridge';
 import { ConnectorsPanel } from './ConnectorsPanel';
 import { DotText } from './DotText';
 import { MatrixView } from './MatrixView';
@@ -91,7 +91,10 @@ export function App() {
 
       {bridge.error && (
         <div className="banner" role="alert">
-          {bridge.error}
+          <span className="banner-text">{bridge.error}</span>
+          <button className="link" aria-label="Dismiss" onClick={clearError}>
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -112,14 +115,19 @@ function StageView({ mode, pick, go }: { mode: ModeId; pick: (id: ModeId) => voi
   return (
     <main className="scroll">
       <section className={`hero ${bridge.connection}${showing ? ' lit' : ''}`} aria-label="The matrix">
-        <MatrixView subscribe={subscribe} size={236} label="Live preview of the Glyph Matrix" />
+        <MatrixView subscribe={subscribe} size={212} label="Live preview of the Glyph Matrix" />
         <div className="hero-side">
           <div className="now">
             <span className="now-tag">{showing ? showing.kind : 'Dark'}</span>
             <span className="now-detail">{showing ? showing.detail : 'Nothing on the matrix'}</span>
           </div>
-          {bridge.connection !== 'connected' && (
-            <p className="hint">Only the preview is lit. Frames reach the phone once it is linked.</p>
+          {bridge.connection === 'offline' && (
+            <p className="hint">
+              Only this preview is lit.{' '}
+              <button className="inline" onClick={() => go('connect')}>
+                Link a phone
+              </button>
+            </p>
           )}
           <label className="field">
             <span className="label">Brightness</span>

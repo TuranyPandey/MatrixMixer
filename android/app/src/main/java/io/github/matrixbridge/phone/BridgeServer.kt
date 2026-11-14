@@ -80,7 +80,8 @@ class BridgeServer(
 
         when (msg) {
             is Protocol.PcMessage.Ping -> conn.send(Protocol.pong())
-            is Protocol.PcMessage.Pair -> pair(conn, session, msg)
+            // Already in: ignore. Answering would spend (and rotate) the code for nothing.
+            is Protocol.PcMessage.Pair -> if (!session.authed) pair(conn, session, msg)
             is Protocol.PcMessage.Auth -> {
                 val known = store.nameFor(msg.token)
                 if (known == null) {

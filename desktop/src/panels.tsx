@@ -144,7 +144,7 @@ export function ConnectPanel({ go }: PanelProps) {
             className="row"
             onSubmit={(ev) => {
               ev.preventDefault();
-              if (ready) pair(code.replace(/\s/g, ''));
+              if (ready && !bridge.pairPending) pair(code.replace(/\s/g, ''));
             }}
           >
             <input
@@ -157,8 +157,8 @@ export function ConnectPanel({ go }: PanelProps) {
               value={code}
               onChange={(ev) => setCode(ev.target.value.replace(/[^\d\s]/g, ''))}
             />
-            <button type="submit" disabled={!ready}>
-              Pair
+            <button type="submit" disabled={!ready || bridge.pairPending}>
+              {bridge.pairPending ? 'Checking' : 'Pair'}
             </button>
             <button type="button" className="ghost" onClick={disconnect}>
               Cancel
@@ -256,43 +256,20 @@ export function TextPanel(_: PanelProps) {
   return (
     <>
       <PageTitle title="Text" lede="Say it in 25 dots. Long messages scroll." />
-      <Section title="Scroll a message">
+      <Section title="Message">
         <form
+          className="compose"
           onSubmit={(ev) => {
             ev.preventDefault();
             send();
           }}
         >
-          <label className="field">
-            <span className="label">Message</span>
-            <input value={text} onChange={(ev) => setText(ev.target.value)} maxLength={200} autoFocus />
-          </label>
-          <p className="hint">
-            Letters, numbers and common symbols. Short text that fits in 25 dots is shown still; longer text scrolls past, then stays up until you clear it or send something else.
-          </p>
-          <div className="row">
-            <label className="field grow">
-              <span className="label">Speed</span>
-              {/* Slider runs slow to fast; the value sent is milliseconds per step, so it is flipped. */}
-              <input type="range" min={20} max={160} value={180 - speed} onChange={(ev) => setSpeed(180 - Number(ev.target.value))} />
-            </label>
-            <label className="field">
-              <span className="label">Repeat</span>
-              <select value={loops} onChange={(ev) => setLoops(ev.target.value)}>
-                <option value="1">Once</option>
-                <option value="forever">Keep scrolling</option>
-                <option value="3">3 times</option>
-                <option value="10">10 times</option>
-              </select>
-            </label>
-          </div>
+          <input aria-label="Message" value={text} onChange={(ev) => setText(ev.target.value)} maxLength={200} autoFocus />
           <button type="submit" disabled={!text.trim()}>
-            Send to matrix
+            Send
           </button>
         </form>
-      </Section>
-      <Section title="Quick messages">
-        <div className="row wrap">
+        <div className="row wrap presets">
           {['BRB', 'IN A CALL', 'DO NOT DISTURB', 'BUILD PASSED', 'LUNCH'].map((preset) => (
             <button
               key={preset}
@@ -305,6 +282,27 @@ export function TextPanel(_: PanelProps) {
               {preset}
             </button>
           ))}
+        </div>
+        <p className="hint">
+          Short text that fits is shown still. Longer text scrolls past, then stays up until you clear it or send something else.
+        </p>
+      </Section>
+      <Section title="How it moves">
+        <div className="row end">
+          <label className="field grow">
+            <span className="label">Speed</span>
+            {/* Slider runs slow to fast; the value sent is milliseconds per step, so it is flipped. */}
+            <input type="range" min={20} max={160} value={180 - speed} onChange={(ev) => setSpeed(180 - Number(ev.target.value))} />
+          </label>
+          <label className="field">
+            <span className="label">Repeat</span>
+            <select value={loops} onChange={(ev) => setLoops(ev.target.value)}>
+              <option value="1">Once</option>
+              <option value="forever">Keep scrolling</option>
+              <option value="3">3 times</option>
+              <option value="10">10 times</option>
+            </select>
+          </label>
         </div>
       </Section>
     </>

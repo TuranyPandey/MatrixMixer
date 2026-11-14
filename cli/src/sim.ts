@@ -86,6 +86,8 @@ export async function startSimulator(options: SimulatorOptions = {}): Promise<Si
       if (msg.t === 'ping') return send(ws, { t: 'pong' });
 
       if (msg.t === 'pair') {
+        // Already in: nothing to do. Answering would spend (and rotate) the code for nothing.
+        if (authed.has(ws)) return;
         if (Date.now() < lockedUntil) {
           return send(ws, { t: 'error', code: 'locked', message: 'Too many wrong codes. Wait 30 seconds.' });
         }
