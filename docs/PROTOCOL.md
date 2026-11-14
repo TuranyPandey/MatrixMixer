@@ -1,4 +1,4 @@
-# Matrix Bridge protocol, version 1
+# MatrixMixer protocol, version 1
 
 JSON text messages over a WebSocket. **The phone is the server** (default port `8765`), the PC is the client. Every message is an object with a `t` field naming its type.
 

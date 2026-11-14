@@ -243,12 +243,12 @@ pub fn run() {
             app.manage(ApiState { info, status });
 
             // Tray icon: closing the window keeps widgets and the API running.
-            let show = MenuItem::with_id(app, "show", "Open Matrix Bridge", true, None::<&str>)?;
+            let show = MenuItem::with_id(app, "show", "Open MatrixMixer", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let island = MenuItem::with_id(app, "island", "Show or hide the island", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show, &island, &quit])?;
             let mut tray = TrayIconBuilder::new()
-                .tooltip("Matrix Bridge")
+                .tooltip("MatrixMixer")
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => show_main_window(app),
@@ -296,7 +296,7 @@ pub fn run() {
             autostart_set
         ])
         .build(tauri::generate_context!())
-        .expect("error while building Matrix Bridge");
+        .expect("error while building MatrixMixer");
 
     app.run(|_app, event| {
         if let RunEvent::Exit = event {

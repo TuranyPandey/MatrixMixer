@@ -1,5 +1,5 @@
 /**
- * Matrix Bridge wire protocol, version 1.
+ * MatrixMixer wire protocol, version 1.
  *
  * JSON text messages over a WebSocket. The phone is the server, the PC is the
  * client. Every message is an object with a `t` (type) field.

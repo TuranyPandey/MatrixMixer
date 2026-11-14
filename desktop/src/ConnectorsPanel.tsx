@@ -106,7 +106,7 @@ export function ConnectorsPanel(_: { go: (tab: string) => void }) {
             ? 'Uses the GitHub CLI you are logged in to, so private repositories work.'
             : 'Running in a browser: public repositories only.'}
         </p>
-        <button className="ghost" onClick={() => notify('GitHub', 'MATRIXBRIDGE: OCTOCAT PUSHED TO MAIN')}>
+        <button className="ghost" onClick={() => notify('GitHub', 'MATRIXMIXER: OCTOCAT PUSHED TO MAIN')}>
           Show a sample
         </button>
       </Connector>
@@ -220,7 +220,7 @@ export function ConnectorsPanel(_: { go: (tab: string) => void }) {
               Save this as <span className="mono">gamestate_integration_matrixbridge.cfg</span> in the game's <span className="mono">game/csgo/cfg</span>{' '}
               folder, then restart the game:
             </p>
-            <pre>{`"Matrix Bridge"
+            <pre>{`"MatrixMixer"
 {
   "uri" "http://127.0.0.1:${port}/game"
   "timeout" "1.0"

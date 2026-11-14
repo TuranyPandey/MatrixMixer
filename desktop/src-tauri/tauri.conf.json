@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Matrix Bridge",
+  "productName": "MatrixMixer",
   "version": "0.1.0",
   "identifier": "io.github.matrixbridge.desktop",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Matrix Bridge",
+        "title": "MatrixMixer",
         "width": 1040,
         "height": 700,
         "minWidth": 860,
@@ -23,7 +23,7 @@
       {
         "label": "island",
         "url": "island.html",
-        "title": "Matrix Bridge island",
+        "title": "MatrixMixer island",
         "width": 250,
         "height": 42,
         "decorations": false,

@@ -4,7 +4,7 @@ import org.json.JSONException
 import org.json.JSONObject
 
 /**
- * Matrix Bridge wire protocol, version 1. JSON text over WebSocket.
+ * MatrixMixer wire protocol, version 1. JSON text over WebSocket.
  * The TypeScript side of this lives in core/src/protocol.ts and the full
  * conversation is written up in docs/PROTOCOL.md. Change all three together.
  */

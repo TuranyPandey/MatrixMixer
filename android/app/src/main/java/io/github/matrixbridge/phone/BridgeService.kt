@@ -156,7 +156,7 @@ class BridgeService : Service(), BridgeServer.Host {
     private fun registerNsd() {
         if (nsdListener != null || server == null) return
         val info = NsdServiceInfo().apply {
-            serviceName = "Matrix Bridge on $deviceName"
+            serviceName = "MatrixMixer on $deviceName"
             serviceType = Protocol.SERVICE_TYPE
             port = Protocol.DEFAULT_PORT
         }

@@ -133,7 +133,7 @@ export function ConnectPanel({ go }: PanelProps) {
         <PageTitle title="Phone" lede="Get your phone on the line. You only pair once." />
         <Section title="Enter the code">
           <p>
-            Open Matrix Bridge on {bridge.phoneName ?? 'the phone'} and type the 6-digit pairing code it shows. You only do
+            Open MatrixMixer on {bridge.phoneName ?? 'the phone'} and type the 6-digit pairing code it shows. You only do
             this once per PC.
           </p>
           <form
@@ -181,7 +181,7 @@ export function ConnectPanel({ go }: PanelProps) {
       )}
 
       <Section title="Find your phone">
-        <p>Start Matrix Bridge on the phone first. Both devices need to be on the same Wi-Fi.</p>
+        <p>Start MatrixMixer on the phone first. Both devices need to be on the same Wi-Fi.</p>
         <div className="row">
           <button onClick={search} disabled={searching}>
             {searching ? 'Searching' : 'Search this network'}

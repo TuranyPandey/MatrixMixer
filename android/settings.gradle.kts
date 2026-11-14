@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Matrix Bridge"
+rootProject.name = "MatrixMixer"
 include(":app")

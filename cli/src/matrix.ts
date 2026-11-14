@@ -38,7 +38,7 @@ Options
   --direct      talk to the phone directly, even if the desktop app is running
   --host, --port, --token   override the saved direct connection
 
-When the Matrix Bridge desktop app is running, commands go through it.
+When the MatrixMixer desktop app is running, commands go through it.
 Otherwise they connect straight to the phone you set up with "matrix pair".
 `;
 
@@ -206,7 +206,7 @@ async function cmdProgress(args: Args): Promise<void> {
   else fail('Usage: matrix progress <0-100> [label]   |   matrix progress done [label]   |   matrix progress clear');
   // The ring is kept by the desktop app between calls, so there is no direct-to-phone version.
   const api = readApiInfo();
-  if (!api || !(await viaApp(api, '/progress', { json }))) fail('"matrix progress" needs the Matrix Bridge desktop app to be running.');
+  if (!api || !(await viaApp(api, '/progress', { json }))) fail('"matrix progress" needs the MatrixMixer desktop app to be running.');
 }
 
 async function cmdImage(args: Args): Promise<void> {

@@ -49,9 +49,9 @@ export function App() {
   return (
     <div className="shell">
       <nav className="nav" aria-label="Sections">
-        <div className="brand" role="img" aria-label="Matrix Bridge">
+        <div className="brand" role="img" aria-label="MatrixMixer">
           <DotText text="Matrix" cell={3} />
-          <DotText text="Bridge" cell={3} color="#e5262b" />
+          <DotText text="Mixer" cell={3} color="#e5262b" />
         </div>
         {TABS.map((t) => (
           <button key={t.id} className={t.id === tab ? 'tab active' : 'tab'} onClick={() => setTab(t.id)}>

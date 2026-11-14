@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-/** Everything Matrix Bridge keeps on the PC lives here. */
+/** Everything MatrixMixer keeps on the PC lives here. */
 export const CONFIG_DIR = process.env.MATRIX_BRIDGE_HOME ?? join(homedir(), '.matrix-bridge');
 
 /** Direct connection details, written by `matrix pair`. */

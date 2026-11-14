@@ -1,8 +1,8 @@
-# Matrix Bridge
+# MatrixMixer
 
 **Your Nothing phone's Glyph Matrix, powered by your PC.**
 
-Matrix Bridge turns the Glyph Matrix on the back of a Nothing phone into a status light for your desk. Your PC decides what it shows: a message, a build's progress, the song you are playing, a red ring while you are on a call. The Glyph Button becomes an extra key for your PC.
+MatrixMixer turns the Glyph Matrix on the back of a Nothing phone into a status light for your desk. Your PC decides what it shows: a message, a build's progress, the song you are playing, a red ring while you are on a call. The Glyph Button becomes an extra key for your PC.
 
 Open source, community-built, and not affiliated with or endorsed by Nothing.
 
@@ -74,8 +74,8 @@ The PC renders everything into finished frames sized for the phone's matrix. The
 
 Grab the Windows installer and the APK from [Releases](../../releases), or build from source with [docs/SETUP.md](docs/SETUP.md).
 
-1. Install the APK on the phone, open **Matrix Bridge** and tap **Start**.
-2. Open Matrix Bridge on the PC and press **Search this network**.
+1. Install the APK on the phone, open **MatrixMixer** and tap **Start**.
+2. Open MatrixMixer on the PC and press **Search this network**.
 3. Type the 6-digit code shown on the phone.
 4. Send something from the **Text** tab.
 

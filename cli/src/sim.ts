@@ -129,7 +129,7 @@ export async function startSimulator(options: SimulatorOptions = {}): Promise<Si
       const { Bonjour } = await import('bonjour-service');
       const bonjour = new Bonjour();
       const type = MDNS_SERVICE.replace(/^_/, '').replace(/\._tcp$/, '');
-      bonjour.publish({ name: 'Matrix Bridge Simulator', type, port });
+      bonjour.publish({ name: 'MatrixMixer Simulator', type, port });
       unpublish = () => bonjour.destroy();
     } catch (err) {
       log(`mDNS advertising unavailable: ${err instanceof Error ? err.message : err}`);

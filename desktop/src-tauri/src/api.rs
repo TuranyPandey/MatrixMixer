@@ -42,7 +42,7 @@ pub fn new_token() -> String {
     rand::thread_rng().sample_iter(&Alphanumeric).take(40).map(char::from).collect()
 }
 
-/// Where Matrix Bridge keeps its files on this PC.
+/// Where MatrixMixer keeps its files on this PC.
 pub fn config_dir() -> PathBuf {
     if let Some(custom) = std::env::var_os("MATRIX_BRIDGE_HOME") {
         return PathBuf::from(custom);

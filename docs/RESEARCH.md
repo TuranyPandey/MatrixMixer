@@ -1,15 +1,15 @@
 # What the Nothing community wants (researched 2026-11-13)
 
-Web research into what Phone (3) owners ask for from the Glyph Matrix, and how it lines up with Matrix Bridge. Most sources are from mid to late 2025; none is a survey, so these are recurring requests, not ranked demand.
+Web research into what Phone (3) owners ask for from the Glyph Matrix, and how it lines up with MatrixMixer. Most sources are from mid to late 2025; none is a survey, so these are recurring requests, not ranked demand.
 
 ## Headline findings
-- The most repeated criticism is that the Glyph Matrix is a gimmick with nothing practical to show (Android Authority, Gizmodo, several reviews). Nothing publicly disputes this. Matrix Bridge's pitch: the matrix becomes a useful status light for your desk.
+- The most repeated criticism is that the Glyph Matrix is a gimmick with nothing practical to show (Android Authority, Gizmodo, several reviews). Nothing publicly disputes this. MatrixMixer's pitch: the matrix becomes a useful status light for your desk.
 - No existing project was found that drives the matrix live from a PC. Everything else runs on the phone.
-- Nothing's SDK now also lists the Phone (4a) Pro, with a 13x13 matrix. Matrix Bridge assumes 25x25 everywhere.
+- Nothing's SDK now also lists the Phone (4a) Pro, with a 13x13 matrix. MatrixMixer assumes 25x25 everywhere.
 
 ## Requests and fit
 
-| Community want | Evidence | Fit with Matrix Bridge |
+| Community want | Evidence | Fit with MatrixMixer |
 |---|---|---|
 | Something practical, not a gimmick | Android Authority: "yet to make it truly practical", left to the community | High: connectors and notices are the answer |
 | Music visualiser | Nothing Community thread; Glyph Beat and SmartGlyph toys | Medium-high: PC knows what's playing and has the audio |

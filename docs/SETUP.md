@@ -41,7 +41,7 @@ No phone to hand? `npm run sim` starts a fake one in the terminal; connect the P
 
 ## 4. First connection
 
-1. Open **Matrix Bridge** on the phone and tap **Start**. Allow notifications if asked.
+1. Open **MatrixMixer** on the phone and tap **Start**. Allow notifications if asked.
 2. In the PC app, **Search this network**. If nothing is found, type the address the phone shows.
 3. Enter the 6-digit code from the phone.
 4. Go to **Text** and send something.

@@ -97,7 +97,7 @@ private fun BridgeScreen() {
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        Text("MATRIX BRIDGE", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 22.sp, letterSpacing = 3.sp)
+        Text("MATRIXMIXER", fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 22.sp, letterSpacing = 3.sp)
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             val (color, label) = when {
@@ -128,7 +128,7 @@ private fun BridgeScreen() {
                     status.code.chunked(3).joinToString(" "),
                     fontFamily = FontFamily.Monospace, fontSize = 44.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp,
                 )
-                Text("Type this into Matrix Bridge on your PC. It changes after each pairing.", color = Dim, fontSize = 13.sp)
+                Text("Type this into MatrixMixer on your PC. It changes after each pairing.", color = Dim, fontSize = 13.sp)
             }
 
             Card("ADDRESS") {
