@@ -1,3 +1,8 @@
+/**
+ * The main window. One "stage": the matrix big at the top, what it is showing
+ * and its brightness under it, then the modes that put things on it. Everything
+ * about setting up (phone, connectors, button, desktop) lives on one Settings page.
+ */
 import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { ConnectionState, Frame } from '@matrix-bridge/core';
@@ -6,20 +11,36 @@ import { ConnectorsPanel } from './ConnectorsPanel';
 import { DotText } from './DotText';
 import { MatrixView } from './MatrixView';
 import { isTauri } from './native';
-import { ButtonsPanel, ConnectPanel, DeveloperPanel, DrawPanel, ImagePanel, TextPanel, WidgetsPanel } from './panels';
+import {
+  ButtonsPanel,
+  ConnectPanel,
+  DeveloperPanel,
+  DrawPanel,
+  ImagePanel,
+  PageTitle,
+  ShowTitles,
+  TextPanel,
+  WidgetsPanel,
+} from './panels';
+import { describeShowing } from './showing';
 
-const TABS = [
-  { id: 'connect', label: 'Phone', Panel: ConnectPanel },
+const MODES = [
   { id: 'text', label: 'Text', Panel: TextPanel },
   { id: 'draw', label: 'Draw', Panel: DrawPanel },
   { id: 'image', label: 'Image', Panel: ImagePanel },
   { id: 'widgets', label: 'Widgets', Panel: WidgetsPanel },
+] as const;
+
+const SETTINGS = [
+  { id: 'connect', label: 'Phone', Panel: ConnectPanel },
   { id: 'connectors', label: 'Connectors', Panel: ConnectorsPanel },
-  { id: 'buttons', label: 'Button', Panel: ButtonsPanel },
+  { id: 'buttons', label: 'Glyph Button', Panel: ButtonsPanel },
+  { id: 'desktop', label: 'Desktop', Panel: DesktopPanel },
   { id: 'developer', label: 'Developer', Panel: DeveloperPanel },
 ] as const;
 
-type TabId = (typeof TABS)[number]['id'];
+type ModeId = (typeof MODES)[number]['id'];
+type SettingId = (typeof SETTINGS)[number]['id'];
 
 const STATUS: Record<ConnectionState, string> = {
   offline: 'No phone on the line',
@@ -34,77 +55,171 @@ const PLACES = ['Top left', 'Top centre', 'Top right', 'Bottom left', 'Bottom ce
 
 export function App() {
   const bridge = useBridge();
-  const [tab, setTab] = useState<TabId>(bridge.settings.token ? 'text' : 'connect');
+  const [mode, setMode] = useState<ModeId>('text');
+  // Not paired yet: open on the page that gets a phone on the line.
+  const [setting, setSetting] = useState<SettingId | null>(bridge.settings.token ? null : 'connect');
+
+  // Panels ask to go somewhere by id; it may be a mode or a settings page.
+  const go = useCallback((id: string) => {
+    if (MODES.some((m) => m.id === id)) {
+      setMode(id as ModeId);
+      setSetting(null);
+    } else if (SETTINGS.some((s) => s.id === id)) setSetting(id as SettingId);
+  }, []);
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <button className="brand" aria-label="MatrixMixer, back to the matrix" onClick={() => setSetting(null)}>
+          <DotText text="Matrix" cell={2.5} />
+          <DotText text="Mixer" cell={2.5} color="#e5262b" />
+        </button>
+        <span className="topbar-gap" />
+        <button className={`status ${bridge.connection}`} onClick={() => go('connect')} title="Phone settings">
+          <span className={`dot ${bridge.connection}`} aria-hidden="true" />
+          {STATUS[bridge.connection]}
+          {bridge.connection === 'connected' && bridge.phoneName ? ` to ${bridge.phoneName}` : ''}
+        </button>
+        <button
+          className={setting ? 'top-link on' : 'top-link'}
+          aria-pressed={setting !== null}
+          onClick={() => setSetting(setting ? null : 'connect')}
+        >
+          {setting ? 'Done' : 'Settings'}
+        </button>
+      </header>
+
+      {bridge.error && (
+        <div className="banner" role="alert">
+          {bridge.error}
+        </div>
+      )}
+
+      {setting ? <SettingsView current={setting} pick={setSetting} go={go} /> : <StageView mode={mode} pick={setMode} go={go} />}
+    </div>
+  );
+}
+
+function StageView({ mode, pick, go }: { mode: ModeId; pick: (id: ModeId) => void; go: (id: string) => void }) {
+  const bridge = useBridge();
+  const subscribe = useCallback((draw: (frame: Frame) => void) => {
+    draw(player.current);
+    return player.onFrame(draw);
+  }, []);
+  const showing = describeShowing(bridge.playing);
+  const Panel = MODES.find((m) => m.id === mode)!.Panel;
+
+  return (
+    <main className="scroll">
+      <section className={`hero ${bridge.connection}${showing ? ' lit' : ''}`} aria-label="The matrix">
+        <MatrixView subscribe={subscribe} size={236} label="Live preview of the Glyph Matrix" />
+        <div className="hero-side">
+          <div className="now">
+            <span className="now-tag">{showing ? showing.kind : 'Dark'}</span>
+            <span className="now-detail">{showing ? showing.detail : 'Nothing on the matrix'}</span>
+          </div>
+          {bridge.connection !== 'connected' && (
+            <p className="hint">Only the preview is lit. Frames reach the phone once it is linked.</p>
+          )}
+          <label className="field">
+            <span className="label">Brightness</span>
+            <input
+              type="range"
+              min={10}
+              max={255}
+              value={bridge.settings.brightness}
+              onChange={(ev) => setBrightness(Number(ev.target.value))}
+            />
+          </label>
+          <button className="ghost" onClick={clearMatrix} disabled={!bridge.playing}>
+            Clear
+          </button>
+        </div>
+      </section>
+
+      <nav className="modes" aria-label="What to put on the matrix" role="tablist">
+        {MODES.map((m) => (
+          <button key={m.id} role="tab" aria-selected={m.id === mode} className={m.id === mode ? 'mode on' : 'mode'} onClick={() => pick(m.id)}>
+            {m.label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="page" key={mode}>
+        {/* The mode row already names the page, so the big dot titles stay on the Settings pages. */}
+        <ShowTitles.Provider value={false}>
+          <Panel go={go} />
+        </ShowTitles.Provider>
+      </div>
+    </main>
+  );
+}
+
+function SettingsView({ current, pick, go }: { current: SettingId; pick: (id: SettingId) => void; go: (id: string) => void }) {
+  const Panel = SETTINGS.find((s) => s.id === current)!.Panel;
+  const bridge = useBridge();
+  return (
+    <div className="settings">
+      <nav className="settings-nav" aria-label="Settings">
+        {SETTINGS.map((s) => (
+          <button key={s.id} className={s.id === current ? 'tab active' : 'tab'} onClick={() => pick(s.id)}>
+            <span className="tab-label">{s.label}</span>
+            {s.id === 'connect' && <span className={`dot ${bridge.connection}`} aria-hidden="true" />}
+          </button>
+        ))}
+        <div className="nav-foot">Community project. Not affiliated with Nothing.</div>
+      </nav>
+      <main className="scroll">
+        <div className="page" key={current}>
+          <Panel go={go} />
+        </div>
+      </main>
+    </div>
+  );
+}
+
+/** Settings > Desktop: what MatrixMixer does on this PC outside its window. */
+function DesktopPanel(_: { go: (id: string) => void }) {
+  const bridge = useBridge();
   // Windows keeps this setting (a Run entry in the registry), so ask it rather than remember it.
   const [autostart, setAutostart] = useState(false);
   useEffect(() => {
     if (isTauri) void invoke<boolean>('autostart_get').then(setAutostart).catch(() => {});
   }, []);
-  const Panel = TABS.find((t) => t.id === tab)!.Panel;
-  const subscribe = useCallback((draw: (frame: Frame) => void) => {
-    draw(player.current);
-    return player.onFrame(draw);
-  }, []);
 
   return (
-    <div className="shell">
-      <nav className="nav" aria-label="Sections">
-        <div className="brand" role="img" aria-label="MatrixMixer">
-          <DotText text="Matrix" cell={3} />
-          <DotText text="Mixer" cell={3} color="#e5262b" />
-        </div>
-        {TABS.map((t) => (
-          <button key={t.id} className={t.id === tab ? 'tab active' : 'tab'} onClick={() => setTab(t.id)}>
-            <span className="tab-label">{t.label}</span>
-            {t.id === 'connect' && <span className={`dot ${bridge.connection}`} aria-hidden="true" />}
-          </button>
-        ))}
-        <div className="nav-foot">Community project. Not affiliated with Nothing.</div>
-      </nav>
-
-      <main className="main">
-        {bridge.error && (
-          <div className="banner" role="alert">
-            {bridge.error}
-          </div>
-        )}
-        <div className="page" key={tab}>
-          <Panel go={(id: string) => setTab(id as TabId)} />
-        </div>
-      </main>
-
-      <aside className={`side ${bridge.connection}${bridge.playing ? ' lit' : ''}`} aria-label="Live preview">
-        <div className="label">On the matrix</div>
-        <MatrixView subscribe={subscribe} size={250} label="Live preview of the Glyph Matrix" />
-        <div className="now">
-          <span className="now-tag">{bridge.playing ? 'Now showing' : 'Dark'}</span>
-          {bridge.playing ?? 'Send something to light it up'}
-        </div>
-
-        <div className={`status ${bridge.connection}`}>
-          <span className={`dot ${bridge.connection}`} aria-hidden="true" />
-          {STATUS[bridge.connection]}
-          {bridge.connection === 'connected' && bridge.phoneName ? ` to ${bridge.phoneName}` : ''}
-        </div>
-        {bridge.connection !== 'connected' && (
-          <p className="hint">The preview still works. Frames reach the phone once it is connected.</p>
-        )}
-
-        <label className="field">
-          <span className="label">Brightness</span>
-          <input
-            type="range"
-            min={10}
-            max={255}
-            value={bridge.settings.brightness}
-            onChange={(ev) => setBrightness(Number(ev.target.value))}
-          />
+    <>
+      <PageTitle title="Desktop" lede="How MatrixMixer sits on this PC when its window is closed." />
+      <section className="card">
+        <h2>Island</h2>
+        <p>A small pill that mirrors the matrix and stays on top of other windows. Hover it for quick controls and widgets.</p>
+        <label className="check">
+          <input type="checkbox" checked={bridge.settings.island} onChange={(ev) => updateSettings({ island: ev.target.checked })} />
+          Show the island
         </label>
-        <button className="ghost" onClick={clearMatrix} disabled={!bridge.playing}>
-          Clear matrix
-        </button>
-        {isTauri && (
-          <label className="check island-toggle">
+        {bridge.settings.island && (
+          <>
+            <span className="label place-label">Where it sits</span>
+            <div className="place" role="radiogroup" aria-label="Where the island sits on the screen">
+              {PLACES.map((name, place) => (
+                <button
+                  key={name}
+                  role="radio"
+                  aria-checked={bridge.settings.islandPlace === place}
+                  aria-label={name}
+                  title={name}
+                  className={bridge.settings.islandPlace === place ? 'place-spot active' : 'place-spot'}
+                  onClick={() => updateSettings({ islandPlace: place })}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+      <section className="card">
+        <h2>Start up</h2>
+        {isTauri ? (
+          <label className="check">
             <input
               type="checkbox"
               checked={autostart}
@@ -116,27 +231,11 @@ export function App() {
             />
             Start with Windows
           </label>
+        ) : (
+          <p className="muted">Only in the desktop app.</p>
         )}
-        <label className="check island-toggle">
-          <input type="checkbox" checked={bridge.settings.island} onChange={(ev) => updateSettings({ island: ev.target.checked })} />
-          Island on the desktop
-        </label>
-        {bridge.settings.island && (
-          <div className="place" role="radiogroup" aria-label="Where the island sits on the screen">
-            {PLACES.map((name, place) => (
-              <button
-                key={name}
-                role="radio"
-                aria-checked={bridge.settings.islandPlace === place}
-                aria-label={name}
-                title={name}
-                className={bridge.settings.islandPlace === place ? 'place-spot active' : 'place-spot'}
-                onClick={() => updateSettings({ islandPlace: place })}
-              />
-            ))}
-          </div>
-        )}
-      </aside>
-    </div>
+        <p className="hint">Started with Windows, it waits in the tray. Closing the window also keeps it running there; Quit is in the tray menu.</p>
+      </section>
+    </>
   );
 }

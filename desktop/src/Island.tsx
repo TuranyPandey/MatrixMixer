@@ -10,6 +10,7 @@ import { formatDuration, frameFromArray, tickerLine, type ConnectionState, type 
 import { receive, send, type IslandLive, type IslandState, type IslandWidget } from './islandLink';
 import { MatrixView } from './MatrixView';
 import { isTauri } from './native';
+import { describeShowing, showingLine } from './showing';
 
 const STATUS: Record<ConnectionState, string> = {
   offline: 'No phone on the line',
@@ -238,7 +239,7 @@ export function Island() {
       {!open ? (
         <div className="island-rest">
           <MatrixView subscribe={subscribe} size={28} label="What is on the matrix" />
-          <span className="island-now">{playing ?? 'Dark'}</span>
+          <span className={playing ? 'island-now' : 'island-now quiet'}>{showingLine(playing) ?? 'Dark'}</span>
           {state?.onAir && <span className="island-air">On air</span>}
           {progress !== null && <span className="island-pct">{progress}%</span>}
           <span className={`dot ${connection}`} aria-hidden="true" />
@@ -249,8 +250,8 @@ export function Island() {
           <div className="island-head">
             <MatrixView subscribe={subscribe} size={84} label="What is on the matrix" />
             <div className="island-info">
-              <div className="label">{playing ? 'Now showing' : 'Dark'}</div>
-              <div className="island-now">{playing ?? 'Send something to light it up'}</div>
+              <div className={playing ? 'label lit' : 'label'}>{describeShowing(playing)?.kind ?? 'Dark'}</div>
+              <div className={playing ? 'island-now big' : 'island-now big quiet'}>{describeShowing(playing)?.detail ?? 'Nothing on the matrix'}</div>
               <div className="island-status">
                 <span className={`dot ${connection}`} aria-hidden="true" />
                 {STATUS[connection]}

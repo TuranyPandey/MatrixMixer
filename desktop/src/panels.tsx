@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DEFAULT_IMAGE_OPTIONS,
   DEFAULT_PORT,
@@ -47,8 +47,12 @@ import {
 
 type PanelProps = { go: (tab: string) => void };
 
+/** False where something else already names the page (the mode row on the stage). */
+export const ShowTitles = createContext(true);
+
 /** Page heading set in the matrix's own dot font, with one line that says what the page is for. */
 export function PageTitle({ title, lede }: { title: string; lede: string }) {
+  if (!useContext(ShowTitles)) return null;
   return (
     <header className="page-head">
       <h1 aria-label={title}>
