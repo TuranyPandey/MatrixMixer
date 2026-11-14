@@ -128,6 +128,17 @@ describe('text', () => {
     expect(src.next(length * 2 - 1)).not.toBeNull();
     expect(src.next(length * 2)).toBeNull();
   });
+
+  it('held text stays on the matrix after its loops', () => {
+    const length = scrollLength(renderText('HELLO WORLD'));
+    const src = textSource('HELLO WORLD', { loops: 1, hold: true });
+    const resting = src.next(length + 500)!;
+    expect(resting).not.toBeNull();
+    expect(resting.some((v) => v > 0)).toBe(true);
+    expect(src.next(length + 9000)).toEqual(resting);
+    // Short text does not scroll, so holding it just means it never ends.
+    expect(textSource('HI', { loops: 1, hold: true }).next(100000)).not.toBeNull();
+  });
 });
 
 describe('images', () => {

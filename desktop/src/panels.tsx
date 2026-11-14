@@ -16,6 +16,7 @@ import {
 } from '@matrix-bridge/core';
 import {
   bitmapToFrame,
+  clearMatrix,
   connect,
   disconnect,
   forgetPhone,
@@ -242,10 +243,11 @@ export function ConnectPanel({ go }: PanelProps) {
 export function TextPanel(_: PanelProps) {
   const [text, setText] = useState('HELLO');
   const [speed, setSpeed] = useState(60);
-  const [loops, setLoops] = useState('forever');
+  const [loops, setLoops] = useState('1');
   const send = (value = text) => {
     if (!value.trim()) return;
-    void player.play(textSource(value, { speedMs: speed, loops: loops === 'forever' ? Infinity : Number(loops) }));
+    // When the passes are over the text stays on the matrix until something replaces it.
+    void player.play(textSource(value, { speedMs: speed, hold: true, loops: loops === 'forever' ? Infinity : Number(loops) }));
   };
   return (
     <>
@@ -262,7 +264,7 @@ export function TextPanel(_: PanelProps) {
             <input value={text} onChange={(ev) => setText(ev.target.value)} maxLength={200} autoFocus />
           </label>
           <p className="hint">
-            Letters, numbers and common symbols. Short text that fits in 25 dots is shown still; longer text scrolls.
+            Letters, numbers and common symbols. Short text that fits in 25 dots is shown still; longer text scrolls past, then stays up until you clear it or send something else.
           </p>
           <div className="row">
             <label className="field grow">
@@ -273,8 +275,8 @@ export function TextPanel(_: PanelProps) {
             <label className="field">
               <span className="label">Repeat</span>
               <select value={loops} onChange={(ev) => setLoops(ev.target.value)}>
-                <option value="forever">Until I stop it</option>
                 <option value="1">Once</option>
+                <option value="forever">Keep scrolling</option>
                 <option value="3">3 times</option>
                 <option value="10">10 times</option>
               </select>
@@ -628,10 +630,16 @@ function NumberField(props: { label: string; value: number; min: number; max: nu
   );
 }
 
-/** One "show this widget" button that reads "Showing" while its widget is up. */
+/** One "show this widget" button. While its widget is up it reads "Showing", and clicking it takes the widget off. */
 function ShowButton(props: { label: string; showing: boolean; onClick: () => void; disabled?: boolean }) {
   return (
-    <button className={props.showing ? 'ghost' : ''} onClick={props.onClick} disabled={props.disabled}>
+    <button
+      className={props.showing ? 'ghost' : ''}
+      aria-pressed={props.showing}
+      title={props.showing ? 'Click to take it off the matrix' : undefined}
+      onClick={props.showing ? clearMatrix : props.onClick}
+      disabled={props.disabled && !props.showing}
+    >
       {props.showing ? 'Showing' : props.label}
     </button>
   );
@@ -750,7 +758,7 @@ export function WidgetsPanel(_: PanelProps) {
   return (
     <>
       <PageTitle title="Widgets" lede="Small things worth a glance at the back of your phone." />
-      <p className="muted">One widget runs at a time. Starting another replaces it.</p>
+      <p className="muted">One widget runs at a time. Starting another replaces it; clicking the one that is showing takes it off.</p>
 
       <Section title="Timer">
         {timer ? (
@@ -791,9 +799,7 @@ export function WidgetsPanel(_: PanelProps) {
 
       <Section title="Clock">
         <div className="row">
-          <button className={playing === 'widget: clock' ? 'ghost' : ''} onClick={() => startClock(hour12)}>
-            {playing === 'widget: clock' ? 'Showing' : 'Show clock'}
-          </button>
+          <ShowButton label="Show clock" showing={playing === 'widget: clock'} onClick={() => startClock(hour12)} />
           <label className="check">
             <input
               type="checkbox"
@@ -810,9 +816,7 @@ export function WidgetsPanel(_: PanelProps) {
 
       <Section title="System meter">
         <p>Ring and number show CPU load. The bar underneath shows memory in use.</p>
-        <button className={playing === 'widget: system meter' ? 'ghost' : ''} onClick={startMeter}>
-          {playing === 'widget: system meter' ? 'Showing' : 'Show system meter'}
-        </button>
+        <ShowButton label="Show system meter" showing={playing === 'widget: system meter'} onClick={startMeter} />
         {!isTauri && <p className="hint">Running in a browser, so these numbers are made up. The desktop app reads real ones.</p>}
       </Section>
 

@@ -96,9 +96,11 @@ fn pc_name() -> String {
         .unwrap_or_else(|_| "PC".to_string())
 }
 
-/// Island sizes in logical pixels: the resting pill and the hover panel.
+/// Island sizes in logical pixels: the resting pill, the hover panel, and the
+/// hover panel on its Widgets tab, which needs more room.
 const ISLAND_COMPACT: (f64, f64) = (250.0, 42.0);
-const ISLAND_EXPANDED: (f64, f64) = (400.0, 196.0);
+const ISLAND_EXPANDED: (f64, f64) = (400.0, 232.0);
+const ISLAND_TALL: (f64, f64) = (400.0, 306.0);
 /// Gap between the island and the edge of the screen, in logical pixels.
 const ISLAND_MARGIN: f64 = 8.0;
 
@@ -107,8 +109,12 @@ static ISLAND_PLACE: AtomicU8 = AtomicU8::new(1);
 
 /// Sizes the island and pins it to its place on the main screen, clear of the taskbar.
 /// The hover panel grows away from the edge it is pinned to.
-fn place_island(window: &tauri::WebviewWindow, expanded: bool) {
-    let (w, h) = if expanded { ISLAND_EXPANDED } else { ISLAND_COMPACT };
+fn place_island(window: &tauri::WebviewWindow, expanded: bool, tall: bool) {
+    let (w, h) = match (expanded, tall) {
+        (false, _) => ISLAND_COMPACT,
+        (true, false) => ISLAND_EXPANDED,
+        (true, true) => ISLAND_TALL,
+    };
     let _ = window.set_size(tauri::LogicalSize::new(w, h));
     if let Ok(Some(monitor)) = window.primary_monitor() {
         let scale = monitor.scale_factor();
@@ -133,7 +139,7 @@ fn island_show(app: tauri::AppHandle, visible: bool, place: u8) {
     ISLAND_PLACE.store(place.min(5), Ordering::SeqCst);
     if let Some(window) = app.get_webview_window("island") {
         if visible {
-            place_island(&window, false);
+            place_island(&window, false, false);
             let _ = window.show();
         } else {
             let _ = window.hide();
@@ -145,10 +151,11 @@ fn island_show(app: tauri::AppHandle, visible: bool, place: u8) {
 static ISLAND_OPEN: AtomicBool = AtomicBool::new(false);
 
 /// Grows the island into its hover panel, or shrinks it back to the pill.
+/// Called again with a different `tall` when the panel changes tab.
 #[tauri::command]
-fn island_expand(app: tauri::AppHandle, expanded: bool) {
+fn island_expand(app: tauri::AppHandle, expanded: bool, tall: Option<bool>) {
     let Some(window) = app.get_webview_window("island") else { return };
-    place_island(&window, expanded);
+    place_island(&window, expanded, tall.unwrap_or(false));
     if ISLAND_OPEN.swap(expanded, Ordering::SeqCst) || !expanded {
         return;
     }

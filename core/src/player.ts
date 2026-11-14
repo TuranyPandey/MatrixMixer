@@ -6,6 +6,7 @@ import {
   staticTextFrame,
 } from './font';
 import { applyMask, blankFrame, type Frame } from './frame';
+import { SIZE } from './protocol';
 
 /**
  * Something that produces frames over time: scrolling text, an animation, a
@@ -22,24 +23,33 @@ export type TextOptions = {
   speedMs?: number;
   /** How many times to scroll past. Infinity loops forever. */
   loops?: number;
+  /**
+   * After the last pass, bring the text back and leave its start on the matrix
+   * until something replaces it, instead of ending on a blank matrix.
+   */
+  hold?: boolean;
   brightness?: number;
 };
 
 /** Text that fits is shown still; longer text scrolls right to left. */
 export function textSource(text: string, options: TextOptions = {}): Source {
-  const { speedMs = 60, loops = Infinity, brightness = 255 } = options;
+  const { speedMs = 60, loops = Infinity, hold = false, brightness = 255 } = options;
   const strip = renderText(text);
   if (fitsWithoutScrolling(strip)) {
     const frame = staticTextFrame(strip, brightness);
     // Still text has nothing to scroll, so "loops" means seconds on screen.
-    const ticks = Number.isFinite(loops) ? Math.max(1, Math.round((loops * 1000) / 250)) : Infinity;
+    const ticks = Number.isFinite(loops) && !hold ? Math.max(1, Math.round((loops * 1000) / 250)) : Infinity;
     return { label: `text: ${text}`, intervalMs: 250, next: (tick) => (tick < ticks ? frame : null) };
   }
   const length = scrollLength(strip);
   return {
     label: `text: ${text}`,
     intervalMs: speedMs,
-    next: (tick) => (tick >= length * loops ? null : scrollFrame(strip, tick % length, brightness)),
+    next: (tick) => {
+      if (tick < length * loops) return scrollFrame(strip, tick % length, brightness);
+      // Scroll in once more and stop with the first letters against the left edge.
+      return hold ? scrollFrame(strip, Math.min(tick - length * loops, SIZE), brightness) : null;
+    },
   };
 }
 

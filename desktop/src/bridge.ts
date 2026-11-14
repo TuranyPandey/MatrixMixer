@@ -305,7 +305,7 @@ async function handleApi(request: ApiRequest): Promise<void> {
         if (!text) return;
         const loops = typeof body.loops === 'number' && body.loops > 0 ? body.loops : Infinity;
         const speedMs = typeof body.speedMs === 'number' ? Math.max(20, Math.min(1000, body.speedMs)) : 60;
-        void player.play(textSource(text, { loops, speedMs }));
+        void player.play(textSource(text, { loops, speedMs, hold: true }));
         break;
       }
       case '/notify': {

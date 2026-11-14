@@ -21,15 +21,36 @@ export type IslandState = {
   progress: number | null;
   /** The microphone or camera is in use. */
   onAir: boolean;
+  /** Widgets that cannot start yet: no ticker symbols, or no place set for the weather. */
+  notReady: IslandWidget[];
+};
+
+/** Widgets the island can put on the matrix, by what follows "widget: " in `playing`. */
+export type IslandWidget = 'clock' | 'system meter' | 'load graph' | 'visualiser' | 'ticker' | 'weather';
+
+/** Readings for the island's Widgets tab. Only sent while that tab is open. */
+export type IslandLive = {
+  /** Percent, 0-100. Null until the first reading. */
+  cpu: number | null;
+  ram: number | null;
+  /** Null until the first answer; empty if no price could be fetched. */
+  quotes: { symbol: string; price: number; changePercent?: number | null }[] | null;
+  weather: { place: string; temperature: number; kind: string; fahrenheit: boolean } | null;
+  timer: { remaining: number; phase: 'focus' | 'break' | 'done'; running: boolean } | null;
 };
 
 /** Main window to island. */
-export type ToIsland = { t: 'state'; state: IslandState } | { t: 'frame'; px: number[] };
+export type ToIsland = { t: 'state'; state: IslandState } | { t: 'frame'; px: number[] } | { t: 'live'; live: IslandLive };
 
 /** Island to main window. */
 export type FromIsland =
   | { t: 'hello' }
   | { t: 'text'; text: string }
+  | { t: 'widget'; name: IslandWidget }
+  /** The Widgets tab came into view (or went away): start or stop sending readings. */
+  | { t: 'watch'; on: boolean }
+  /** `start` begins a 25/5 Pomodoro, `toggle` pauses or resumes, `stop` ends or dismisses. */
+  | { t: 'timer'; do: 'start' | 'toggle' | 'stop' }
   | { t: 'brightness'; value: number }
   | { t: 'clear' }
   | { t: 'open' }

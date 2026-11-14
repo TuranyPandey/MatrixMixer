@@ -236,6 +236,28 @@ html.island, html.island body { background: transparent; overflow: hidden; }
 .island-actions { display: flex; align-items: center; gap: 6px; }
 .island-actions .chip, .island-send .chip { padding: 5px 9px; font-size: 11px; }
 .island-gap { flex: 1; }
+.island-tabs { display: flex; gap: 14px; border-bottom: 1px solid var(--line); }
+.island-tabs button { background: none; border: 0; border-bottom: 1px solid transparent; border-radius: 0; margin-bottom: -1px; padding: 0 0 5px; color: var(--muted); font: 500 11px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
+.island-tabs button:hover { background: none; color: var(--text); }
+.island-tabs button.on { color: var(--text); border-bottom-color: var(--text); }
+/* Widgets tab: two columns of live readings. Clicking one puts it on the matrix. */
+.island-widgets { display: grid; grid-template-columns: 1fr 1fr; column-gap: 18px; margin: -6px 0; }
+.island-row { display: flex; align-items: center; min-width: 0; height: 28px; border-bottom: 1px solid var(--line); }
+.island-row:nth-last-child(-n + 2) { border-bottom: 0; }
+.island-row button { background: none; border: 0; border-radius: 0; padding: 0; color: var(--text); }
+.island-row button:hover:not(:disabled) { background: none; }
+.island-row .read { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; gap: 8px; text-align: left; }
+.island-row .read:disabled { opacity: 0.45; }
+.island-row .name { font: 500 9.5px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.island-row .read:hover:not(:disabled) .name { color: var(--text); }
+.island-row .value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; font: 500 12px var(--mono); }
+.island-row .value.quiet { color: var(--muted); }
+.island-row .pip { flex: none; width: 5px; height: 5px; border-radius: 50%; background: var(--line-strong); }
+.island-row.on .pip { background: var(--accent); }
+.island-row .stop { margin-left: 8px; color: var(--muted); font: 500 12px var(--mono); }
+.island-row .stop:hover { color: var(--accent); }
+.island-spark { flex: 1; display: flex; align-items: flex-end; justify-content: flex-end; gap: 1px; height: 14px; }
+.island-spark i { width: 3px; min-height: 1px; background: var(--text); }
 .island-rest .matrix { box-shadow: none; margin: 0; }
 /* Island placement: a small picture of the screen with six spots. */
 .place { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 0; width: 132px; margin-top: 10px; padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: 6px; }

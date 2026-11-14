@@ -18,9 +18,42 @@ import {
   weatherKind,
   type Frame,
   type Quote,
+  type WeatherKind,
 } from '@matrix-bridge/core';
-import { getSettings, player, updateSettings } from './bridge';
+import { clearMatrix, getSettings, player, updateSettings } from './bridge';
 import { audioBands, fetchText, systemStats } from './native';
+
+/** The widgets that are simply on or off, by the name after "widget: " in the player's label. */
+export type WidgetName = 'clock' | 'system meter' | 'load graph' | 'visualiser' | 'ticker' | 'weather';
+
+/**
+ * Starts a widget, or takes it off the matrix if it is the one showing.
+ * Resolves with a message if it could not start.
+ */
+export async function toggleWidget(name: WidgetName, options: { hour12?: boolean } = {}): Promise<string | null> {
+  if (player.label === `widget: ${name}`) {
+    clearMatrix();
+    return null;
+  }
+  switch (name) {
+    case 'clock':
+      startClock(options.hour12 ?? false);
+      return null;
+    case 'system meter':
+      startMeter();
+      return null;
+    case 'load graph':
+      startGraph();
+      return null;
+    case 'visualiser':
+      startVisualiser();
+      return null;
+    case 'ticker':
+      return startTicker();
+    case 'weather':
+      return startWeather();
+  }
+}
 
 export function startClock(hour12: boolean): void {
   void player.play(liveSource('widget: clock', 500, () => clockFrame(new Date(), hour12)));
@@ -100,6 +133,20 @@ async function quote(symbol: string): Promise<Quote> {
   return { symbol: symbol.replace(/-USD$|\.[A-Z]+$/, ''), price, changePercent };
 }
 
+let quotesCache: { key: string; at: number; quotes: Quote[] } | null = null;
+
+/** Prices for the saved symbols, at most a minute old. Empty if none could be fetched. */
+export async function latestQuotes(): Promise<Quote[]> {
+  const symbols = getSettings().widgets.ticker;
+  const key = symbols.join(',');
+  if (quotesCache && quotesCache.key === key && Date.now() - quotesCache.at < TICKER_EVERY_MS) return quotesCache.quotes;
+  // Claim the slot first so a second caller does not fetch the same prices again.
+  const mine = (quotesCache = { key, at: Date.now(), quotes: quotesCache?.key === key ? quotesCache.quotes : [] });
+  const quotes = (await Promise.allSettled(symbols.map(quote))).flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
+  if (quotes.length > 0) mine.quotes = quotes;
+  return mine.quotes;
+}
+
 /** Starts the ticker. Resolves with a message if no price could be fetched. */
 export async function startTicker(): Promise<string | null> {
   const symbols = getSettings().widgets.ticker;
@@ -138,7 +185,32 @@ export async function setWeatherPlace(name: string, fahrenheit: boolean): Promis
   return null;
 }
 
+export type WeatherNow = { place: string; temperature: number; kind: WeatherKind; fahrenheit: boolean };
+
+let weatherCache: { key: string; at: number; now: WeatherNow | null } | null = null;
+
+/** The weather at the saved place, at most 15 minutes old. Null if no place is set or it could not be read. */
+export async function latestWeather(): Promise<WeatherNow | null> {
+  const w = getSettings().widgets.weather;
+  if (!w) return null;
+  const key = `${w.latitude},${w.longitude},${w.fahrenheit}`;
+  if (weatherCache && weatherCache.key === key && Date.now() - weatherCache.at < WEATHER_EVERY_MS) return weatherCache.now;
+  const mine = (weatherCache = { key, at: Date.now(), now: weatherCache?.key === key ? weatherCache.now : null });
+  try {
+    mine.now = await fetchWeather();
+  } catch {
+    // Try again in a minute, not in fifteen.
+    mine.at = Date.now() - WEATHER_EVERY_MS + 60_000;
+  }
+  return mine.now;
+}
+
 async function readWeather(): Promise<Frame> {
+  const now = await fetchWeather();
+  return weatherFrame(now.temperature, now.kind);
+}
+
+async function fetchWeather(): Promise<WeatherNow> {
   const w = getSettings().widgets.weather!;
   const unit = w.fahrenheit ? '&temperature_unit=fahrenheit' : '';
   const text = await fetchText(
@@ -146,7 +218,7 @@ async function readWeather(): Promise<Frame> {
   );
   const current = (JSON.parse(text) as { current?: { temperature_2m?: number; weather_code?: number } }).current;
   if (typeof current?.temperature_2m !== 'number') throw new Error('No weather came back');
-  return weatherFrame(current.temperature_2m, weatherKind(current.weather_code ?? 3));
+  return { place: w.place, temperature: current.temperature_2m, kind: weatherKind(current.weather_code ?? 3), fahrenheit: w.fahrenheit };
 }
 
 /** Shows the weather for the saved place. Resolves with a message if it could not be read. */
@@ -197,6 +269,16 @@ const LABEL = 'widget: timer';
 function publish(next: TimerState | null): void {
   timer = next;
   listeners.forEach((fn) => fn());
+}
+
+export function getTimer(): TimerState | null {
+  return timer;
+}
+
+/** Calls `fn` whenever the timer changes. Returns the function that stops listening. */
+export function onTimer(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => void listeners.delete(fn);
 }
 
 export function useTimer(): TimerState | null {
