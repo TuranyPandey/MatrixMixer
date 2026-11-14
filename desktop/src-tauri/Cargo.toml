@@ -18,6 +18,8 @@ tauri-plugin-websocket = "2"
 # One copy at a time (a second launch just brings the window up), and "Start with Windows".
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
+# Windows notifications, for things that end while you are looking elsewhere (the timer).
+tauri-plugin-notification = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Pure-Rust helpers. Versions are pinned to APIs this code was checked against.

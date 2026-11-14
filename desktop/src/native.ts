@@ -57,6 +57,17 @@ export async function systemStats(): Promise<{ cpu: number; ram: number }> {
   return { cpu: 50 + 40 * Math.sin(t / 3), ram: 62 };
 }
 
+/** A notification on this PC, outside the app's window. Never throws: a missed notification must not break a timer. */
+export async function desktopNotify(title: string, body: string): Promise<void> {
+  try {
+    if (isTauri) await invoke('desktop_notify', { title, body });
+    else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification(title, { body });
+    else console.info(`[browser] notification: ${title} - ${body}`);
+  } catch (err) {
+    console.warn('Could not show a notification', err);
+  }
+}
+
 /** Runs a Glyph Button action on this PC. Names are listed in src-tauri/src/actions.rs. */
 export async function runAction(kind: string, arg?: string): Promise<void> {
   if (!isTauri) {

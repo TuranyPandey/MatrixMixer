@@ -16,12 +16,13 @@ import {
   timerFrame,
   weatherFrame,
   weatherKind,
+  noticeSource,
   type Frame,
   type Quote,
   type WeatherKind,
 } from '@matrix-bridge/core';
-import { clearMatrix, getSettings, player, registerAction, textSpeed, updateSettings } from './bridge';
-import { audioBands, fetchText, systemStats } from './native';
+import { clearMatrix, getSettings, noticeSpeed, player, registerAction, textSpeed, updateSettings } from './bridge';
+import { audioBands, desktopNotify, fetchText, systemStats } from './native';
 
 /** The widgets that are simply on or off, by the name after "widget: " in the player's label. */
 export type WidgetName = 'clock' | 'system meter' | 'load graph' | 'visualiser' | 'ticker' | 'weather';
@@ -335,14 +336,29 @@ function render(tick: number): Frame | null {
   return timerFrame(timer.remaining, timer.total, timer.phase === 'break');
 }
 
+/**
+ * Says that the timer ran out or changed phase, in the two places someone
+ * might be looking: the matrix (a notice that passes over whatever is showing,
+ * timer or not, and then gives the matrix back) and a Windows notification.
+ */
+function announce(onMatrix: string, title: string, body: string): void {
+  // Not from inside the timer's own frame: this is called while the player is drawing it.
+  setTimeout(() => player.notify(noticeSource(onMatrix, noticeSpeed)), 0);
+  void desktopNotify(title, body);
+}
+
 /** Moves to the next phase when the clock runs out. */
 function advance(): void {
   if (!timer) return;
   if (timer.kind === 'countdown') {
+    const minutes = timer.focusMinutes;
     publish({ ...timer, phase: 'done', running: false, remaining: 0 });
+    announce('TIME UP', "Time's up", `Your ${minutes} minute countdown has finished.`);
     return;
   }
   const toBreak = timer.phase === 'focus';
+  if (toBreak) announce('BREAK', 'Break time', `Focus session done. Take ${timer.breakMinutes} ${timer.breakMinutes === 1 ? 'minute' : 'minutes'}.`);
+  else announce('FOCUS', 'Back to focus', `Break over. ${timer.focusMinutes} ${timer.focusMinutes === 1 ? 'minute' : 'minutes'} of focus.`);
   const total = (toBreak ? timer.breakMinutes : timer.focusMinutes) * 60;
   endsAt = Date.now() + total * 1000;
   publish({

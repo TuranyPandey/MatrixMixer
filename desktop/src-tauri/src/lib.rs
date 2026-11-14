@@ -197,6 +197,13 @@ fn autostart_set(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
     if enabled { auto.enable() } else { auto.disable() }.map_err(|e| e.to_string())
 }
 
+/// Shows a Windows notification. Used when a timer runs out or changes phase.
+#[tauri::command]
+fn desktop_notify(app: tauri::AppHandle, title: String, body: String) -> Result<(), String> {
+    use tauri_plugin_notification::NotificationExt;
+    app.notification().builder().title(title).body(body).show().map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn show_main(app: tauri::AppHandle) {
     show_main_window(&app);
@@ -220,6 +227,7 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec![HIDDEN_FLAG]),
         ))
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_websocket::init())
         .manage(stats::Stats::new())
         .setup(|app| {
@@ -293,7 +301,8 @@ pub fn run() {
             island_expand,
             show_main,
             autostart_get,
-            autostart_set
+            autostart_set,
+            desktop_notify
         ])
         .build(tauri::generate_context!())
         .expect("error while building MatrixMixer");
