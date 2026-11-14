@@ -1,9 +1,11 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import type { ConnectionState, Frame } from '@matrix-bridge/core';
 import { clearMatrix, player, setBrightness, updateSettings, useBridge } from './bridge';
 import { ConnectorsPanel } from './ConnectorsPanel';
 import { DotText } from './DotText';
 import { MatrixView } from './MatrixView';
+import { isTauri } from './native';
 import { ButtonsPanel, ConnectPanel, DeveloperPanel, DrawPanel, ImagePanel, TextPanel, WidgetsPanel } from './panels';
 
 const TABS = [
@@ -33,6 +35,11 @@ const PLACES = ['Top left', 'Top centre', 'Top right', 'Bottom left', 'Bottom ce
 export function App() {
   const bridge = useBridge();
   const [tab, setTab] = useState<TabId>(bridge.settings.token ? 'text' : 'connect');
+  // Windows keeps this setting (a Run entry in the registry), so ask it rather than remember it.
+  const [autostart, setAutostart] = useState(false);
+  useEffect(() => {
+    if (isTauri) void invoke<boolean>('autostart_get').then(setAutostart).catch(() => {});
+  }, []);
   const Panel = TABS.find((t) => t.id === tab)!.Panel;
   const subscribe = useCallback((draw: (frame: Frame) => void) => {
     draw(player.current);
@@ -96,6 +103,20 @@ export function App() {
         <button className="ghost" onClick={clearMatrix} disabled={!bridge.playing}>
           Clear matrix
         </button>
+        {isTauri && (
+          <label className="check island-toggle">
+            <input
+              type="checkbox"
+              checked={autostart}
+              onChange={(ev) => {
+                const enabled = ev.target.checked;
+                setAutostart(enabled);
+                void invoke('autostart_set', { enabled }).catch(() => setAutostart(!enabled));
+              }}
+            />
+            Start with Windows
+          </label>
+        )}
         <label className="check island-toggle">
           <input type="checkbox" checked={bridge.settings.island} onChange={(ev) => updateSettings({ island: ev.target.checked })} />
           Island on the desktop

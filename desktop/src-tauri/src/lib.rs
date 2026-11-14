@@ -180,6 +180,23 @@ fn island_expand(app: tauri::AppHandle, expanded: bool, tall: Option<bool>) {
     });
 }
 
+/// Passed by the "Start with Windows" entry so the app comes up in the tray, not in your face.
+const HIDDEN_FLAG: &str = "--hidden";
+
+/// Whether the app starts when you sign in to Windows.
+#[tauri::command]
+fn autostart_get(app: tauri::AppHandle) -> bool {
+    use tauri_plugin_autostart::ManagerExt;
+    app.autolaunch().is_enabled().unwrap_or(false)
+}
+
+#[tauri::command]
+fn autostart_set(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+    let auto = app.autolaunch();
+    if enabled { auto.enable() } else { auto.disable() }.map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn show_main(app: tauri::AppHandle) {
     show_main_window(&app);
@@ -196,6 +213,13 @@ fn show_main_window(app: &tauri::AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        // Must be first. Launching a second copy (say, from the desktop shortcut while
+        // the app sits in the tray) brings up the window of the one already running.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main_window(app)))
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec![HIDDEN_FLAG]),
+        ))
         .plugin(tauri_plugin_websocket::init())
         .manage(stats::Stats::new())
         .setup(|app| {
@@ -239,6 +263,11 @@ pub fn run() {
                 tray = tray.icon(icon.clone());
             }
             tray.build(app)?;
+
+            // The main window is created hidden (tauri.conf.json) so a start at sign-in never flashes it.
+            if !std::env::args().any(|arg| arg == HIDDEN_FLAG) {
+                show_main_window(app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -262,7 +291,9 @@ pub fn run() {
             fetch_text,
             island_show,
             island_expand,
-            show_main
+            show_main,
+            autostart_get,
+            autostart_set
         ])
         .build(tauri::generate_context!())
         .expect("error while building Matrix Bridge");
