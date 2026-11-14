@@ -26,8 +26,8 @@ const FOLD_MS = 350;
 
 /**
  * The Widgets tab: the same shelf of small live matrices as the main window.
- * Clicking one puts it on the matrix (again takes it off); the line under the
- * shelf reads out the one you last pointed at.
+ * Clicking one only picks it; the line under the shelf reads it out and holds
+ * the button that puts it on the matrix or takes it off.
  */
 function Widgets({ live, playing, notReady }: { live: IslandLive | null; playing: string | null; notReady: IslandWidget[] }) {
   const [now, setNow] = useState(() => new Date());
@@ -60,11 +60,24 @@ function Widgets({ live, playing, notReady }: { live: IslandLive | null; playing
   });
 
   const blocked = (id: ShelfId) => id !== 'timer' && id !== showing && notReady.includes(id);
-  const click = (id: ShelfId) => {
-    setFocus(id);
+  /** Puts the picked widget on the matrix or takes it off; for the timer, starts, pauses or dismisses it. */
+  const act = (id: ShelfId) => {
+    if (blocked(id)) return;
     if (id !== 'timer') send('island:from', { t: 'widget', name: id });
     else send('island:from', { t: 'timer', do: !timer ? 'start' : timer.phase === 'done' ? 'stop' : 'toggle' });
   };
+  const actLabel =
+    focus !== 'timer'
+      ? focus === showing
+        ? 'Take off'
+        : 'Show'
+      : !timer
+        ? 'Start'
+        : timer.phase === 'done'
+          ? 'Dismiss'
+          : timer.running
+            ? 'Pause'
+            : 'Resume';
 
   const quotes = live?.quotes ?? [];
   // With several symbols, step through them every three seconds.
@@ -73,9 +86,9 @@ function Widgets({ live, playing, notReady }: { live: IslandLive | null; playing
   const reading: Record<ShelfId, string> = {
     clock: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: live?.hour12 ?? false }),
     timer: !timer
-      ? 'Click to start 25 minutes of focus'
+      ? '25 minutes of focus'
       : timer.phase === 'done'
-        ? "Time's up. Click to dismiss"
+        ? "Time's up"
         : `${timer.phase === 'break' ? 'Break ' : ''}${formatDuration(timer.remaining)}${timer.running ? '' : ' paused'}`,
     'system meter': cpu === null ? 'Reading' : `CPU ${cpu}%  RAM ${live?.ram ?? 0}%`,
     'load graph': cpu === null ? 'Reading' : `CPU ${cpu}% now, last 25 seconds`,
@@ -99,10 +112,10 @@ function Widgets({ live, playing, notReady }: { live: IslandLive | null; playing
             aria-selected={w.id === showing}
             aria-label={w.name}
             className={`island-item${w.id === showing ? ' on' : ''}${w.id === focus ? ' focus' : ''}`}
-            disabled={blocked(w.id)}
-            onMouseEnter={() => setFocus(w.id)}
-            onFocus={() => setFocus(w.id)}
-            onClick={() => click(w.id)}
+            title={`${w.name}. Double-click to ${w.id === showing ? 'take it off' : 'put it on the matrix'}`}
+            // A click only picks. Pointing or clicking around the shelf never changes the matrix.
+            onClick={() => setFocus(w.id)}
+            onDoubleClick={() => act(w.id)}
           >
             <MatrixView frame={frames[w.id]} size={40} label={`${w.name} preview`} />
           </button>
@@ -111,6 +124,9 @@ function Widgets({ live, playing, notReady }: { live: IslandLive | null; playing
       <div className={focus === showing ? 'island-read on' : 'island-read'}>
         <span className="name">{name}</span>
         <span className="value">{reading[focus]}</span>
+        <button className="act" disabled={blocked(focus)} onClick={() => act(focus)}>
+          {actLabel}
+        </button>
         {focus === 'timer' && timer && timer.phase !== 'done' && (
           <button className="stop" aria-label="Stop timer" title="Stop timer" onClick={() => send('island:from', { t: 'timer', do: 'stop' })}>
             Stop

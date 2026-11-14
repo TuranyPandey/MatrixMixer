@@ -1,8 +1,9 @@
 /**
  * Widgets mode: a shelf of small live matrices, one per widget. Clicking one
- * puts it on the real matrix (clicking it again takes it off) and opens its
- * options underneath, so there is one widget's worth of controls on screen at
+ * opens its options underneath, with one button that puts it on the real
+ * matrix or takes it off, so there is one widget's worth of controls on screen at
  * a time instead of a page of every option for every widget.
+ * Selecting never changes the matrix: looking through the shelf must not switch what the phone shows.
  */
 import { useEffect, useRef, useState } from 'react';
 import { formatDuration, type Frame } from '@matrix-bridge/core';
@@ -89,11 +90,6 @@ export function WidgetsPanel(_: { go: (tab: string) => void }) {
     if (!ready(id) && showingId !== id) return;
     void toggleWidget(id, { hour12 }).then(setProblem, (err) => setProblem(err instanceof Error ? err.message : String(err)));
   };
-  const pick = (id: ShelfId) => {
-    setPicked(id);
-    toggle(id);
-  };
-
   const current = SHELF.find((w) => w.id === picked)!;
   const isShowing = showingId === picked;
 
@@ -106,8 +102,13 @@ export function WidgetsPanel(_: { go: (tab: string) => void }) {
             role="option"
             aria-selected={w.id === picked}
             className={`shelf-item${w.id === picked ? ' picked' : ''}${w.id === showingId ? ' on' : ''}`}
-            title={w.id === showingId ? `${w.name} is on the matrix. Click to take it off` : `Show ${w.name}`}
-            onClick={() => pick(w.id)}
+            title={w.id === showingId ? `${w.name} is on the matrix` : `${w.name}. Double-click to put it on the matrix`}
+            // A click only opens the widget's options. Putting it on the matrix is the button's job (or a double-click).
+            onClick={() => {
+              setPicked(w.id);
+              setProblem(null);
+            }}
+            onDoubleClick={() => toggle(w.id)}
           >
             <MatrixView frame={previews[w.id]} size={78} label={`${w.name} preview`} />
             <span className="shelf-name">{w.name}</span>
