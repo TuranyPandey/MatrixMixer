@@ -19,8 +19,14 @@ export type Source = {
 };
 
 export type TextOptions = {
-  /** Milliseconds per one-pixel scroll step. Lower is faster. */
-  speedMs?: number;
+  /**
+   * Milliseconds per one-pixel scroll step. Lower is faster. Pass a function
+   * to have it read on every step, so a speed control acts on text that is
+   * already scrolling.
+   */
+  speedMs?: number | (() => number);
+  /** Replaces the default `text: ...` label. */
+  label?: string;
   /** How many times to scroll past. Infinity loops forever. */
   loops?: number;
   /**
@@ -31,20 +37,30 @@ export type TextOptions = {
   brightness?: number;
 };
 
+/** A speed option as a number of milliseconds, kept within what the phone can keep up with. */
+export function stepMs(speed: number | (() => number)): number {
+  const ms = typeof speed === 'function' ? speed() : speed;
+  return Math.max(15, Math.min(1000, Number.isFinite(ms) ? ms : 60));
+}
+
 /** Text that fits is shown still; longer text scrolls right to left. */
 export function textSource(text: string, options: TextOptions = {}): Source {
   const { speedMs = 60, loops = Infinity, hold = false, brightness = 255 } = options;
+  const label = options.label ?? `text: ${text}`;
   const strip = renderText(text);
   if (fitsWithoutScrolling(strip)) {
     const frame = staticTextFrame(strip, brightness);
     // Still text has nothing to scroll, so "loops" means seconds on screen.
     const ticks = Number.isFinite(loops) && !hold ? Math.max(1, Math.round((loops * 1000) / 250)) : Infinity;
-    return { label: `text: ${text}`, intervalMs: 250, next: (tick) => (tick < ticks ? frame : null) };
+    return { label, intervalMs: 250, next: (tick) => (tick < ticks ? frame : null) };
   }
   const length = scrollLength(strip);
   return {
-    label: `text: ${text}`,
-    intervalMs: speedMs,
+    label,
+    // A getter: the player asks before every step.
+    get intervalMs() {
+      return stepMs(speedMs);
+    },
     next: (tick) => {
       if (tick < length * loops) return scrollFrame(strip, tick % length, brightness);
       // Scroll in once more and stop with the first letters against the left edge.

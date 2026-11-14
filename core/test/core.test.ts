@@ -129,6 +129,17 @@ describe('text', () => {
     expect(src.next(length * 2)).toBeNull();
   });
 
+  it('reads a speed function on every step, so the speed can change mid-scroll', () => {
+    let speed = 60;
+    const src = textSource('HELLO WORLD', { speedMs: () => speed });
+    expect(src.intervalMs).toBe(60);
+    speed = 25;
+    expect(src.intervalMs).toBe(25);
+    speed = 1; // clamped to what the phone can keep up with
+    expect(src.intervalMs).toBe(15);
+    expect(textSource('HELLO WORLD', { label: 'widget: ticker' }).label).toBe('widget: ticker');
+  });
+
   it('held text stays on the matrix after its loops', () => {
     const length = scrollLength(renderText('HELLO WORLD'));
     const src = textSource('HELLO WORLD', { loops: 1, hold: true });

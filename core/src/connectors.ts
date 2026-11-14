@@ -6,25 +6,27 @@
  */
 import { fitsWithoutScrolling, renderText, scrollFrame, scrollLength, staticTextFrame } from './font';
 import { blankFrame, setPixel, type Frame } from './frame';
-import type { Source } from './player';
+import { stepMs, type Source } from './player';
 import { RING } from './widgets';
 
 /**
  * A short notice: the outer ring blinks twice to catch the eye, then the text
  * passes once. Finite, so it suits `Player.notify`.
  */
-export function noticeSource(text: string, speedMs = 45): Source {
+export function noticeSource(text: string, speedMs: number | (() => number) = 45): Source {
   const strip = renderText(text);
   const still = fitsWithoutScrolling(strip) ? staticTextFrame(strip) : null;
   // Text that fits is held for about three seconds instead of scrolling.
-  const length = still ? Math.round(3000 / speedMs) : scrollLength(strip);
+  const length = still ? Math.round(3000 / stepMs(speedMs)) : scrollLength(strip);
   const ring = blankFrame();
   RING.forEach(([x, y]) => setPixel(ring, x, y, 255));
   const dark = blankFrame();
   const blink: Frame[] = [ring, ring, ring, dark, dark, ring, ring, ring, dark, dark];
   return {
     label: `notice: ${text}`,
-    intervalMs: speedMs,
+    get intervalMs() {
+      return stepMs(speedMs);
+    },
     next: (tick) => {
       if (tick < blink.length) return blink[tick]!;
       const step = tick - blink.length;

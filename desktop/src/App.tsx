@@ -141,6 +141,18 @@ function StageView({ mode, pick, go }: { mode: ModeId; pick: (id: ModeId) => voi
               onChange={(ev) => setBrightness(Number(ev.target.value))}
             />
           </label>
+          <label className="field">
+            <span className="label">Text speed</span>
+            {/* Runs slow to fast; the setting is milliseconds per step, so it is flipped. */}
+            <input
+              type="range"
+              min={20}
+              max={160}
+              step={5}
+              value={180 - bridge.settings.textSpeed}
+              onChange={(ev) => updateSettings({ textSpeed: 180 - Number(ev.target.value) })}
+            />
+          </label>
           <button className="ghost" onClick={clearMatrix} disabled={!bridge.playing}>
             Clear
           </button>

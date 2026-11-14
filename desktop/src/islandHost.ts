@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { textSource } from '@matrix-bridge/core';
 import { getActivity, onActivity } from './activities';
-import { clearMatrix, getState, player, setBrightness, subscribe, updateSettings } from './bridge';
+import { clearMatrix, getState, player, setBrightness, subscribe, textSpeed, updateSettings } from './bridge';
 import { receive, send, type IslandLive, type IslandState, type IslandWidget } from './islandLink';
 import { isTauri, systemStats } from './native';
 import { getTimer, latestQuotes, latestWeather, onTimer, startPomodoro, stopTimer, toggleTimer, toggleWidget } from './widgets';
@@ -103,7 +103,7 @@ export function startIslandHost(): void {
         break;
       case 'text':
         // Passes once, then stays put until something else takes the matrix.
-        if (message.text.trim()) void player.play(textSource(message.text.trim(), { loops: 1, hold: true, speedMs: 60 }));
+        if (message.text.trim()) void player.play(textSource(message.text.trim(), { loops: 1, hold: true, speedMs: textSpeed }));
         break;
       case 'widget':
         void toggleWidget(message.name, { hour12: getState().settings.widgets.hour12 }).catch(() => {});

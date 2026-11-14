@@ -21,6 +21,7 @@ import {
   pair,
   player,
   runBinding,
+  textSpeed,
   updateSettings,
   useBridge,
   type ActionKind,
@@ -231,12 +232,11 @@ export function ConnectPanel({ go }: PanelProps) {
 
 export function TextPanel(_: PanelProps) {
   const [text, setText] = useState('HELLO');
-  const [speed, setSpeed] = useState(60);
   const [loops, setLoops] = useState('1');
   const send = (value = text) => {
     if (!value.trim()) return;
     // When the passes are over the text stays on the matrix until something replaces it.
-    void player.play(textSource(value, { speedMs: speed, hold: true, loops: loops === 'forever' ? Infinity : Number(loops) }));
+    void player.play(textSource(value, { speedMs: textSpeed, hold: true, loops: loops === 'forever' ? Infinity : Number(loops) }));
   };
   return (
     <>
@@ -250,6 +250,12 @@ export function TextPanel(_: PanelProps) {
           }}
         >
           <input aria-label="Message" value={text} onChange={(ev) => setText(ev.target.value)} maxLength={200} autoFocus />
+          <select aria-label="Repeat" value={loops} onChange={(ev) => setLoops(ev.target.value)}>
+            <option value="1">Once</option>
+            <option value="3">3 times</option>
+            <option value="10">10 times</option>
+            <option value="forever">Keep scrolling</option>
+          </select>
           <button type="submit" disabled={!text.trim()}>
             Send
           </button>
@@ -269,26 +275,8 @@ export function TextPanel(_: PanelProps) {
           ))}
         </div>
         <p className="hint">
-          Short text that fits is shown still. Longer text scrolls past, then stays up until you clear it or send something else.
+          Short text that fits is shown still. Longer text scrolls past, then stays up until you clear it or send something else. How fast it scrolls is the Text speed slider next to the matrix.
         </p>
-      </Section>
-      <Section title="How it moves">
-        <div className="row end">
-          <label className="field grow">
-            <span className="label">Speed</span>
-            {/* Slider runs slow to fast; the value sent is milliseconds per step, so it is flipped. */}
-            <input type="range" min={20} max={160} value={180 - speed} onChange={(ev) => setSpeed(180 - Number(ev.target.value))} />
-          </label>
-          <label className="field">
-            <span className="label">Repeat</span>
-            <select value={loops} onChange={(ev) => setLoops(ev.target.value)}>
-              <option value="1">Once</option>
-              <option value="forever">Keep scrolling</option>
-              <option value="3">3 times</option>
-              <option value="10">10 times</option>
-            </select>
-          </label>
-        </div>
       </Section>
     </>
   );

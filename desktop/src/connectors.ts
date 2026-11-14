@@ -5,7 +5,7 @@
  */
 import { useSyncExternalStore } from 'react';
 import { githubNews, noticeSource, type GithubActivity, type GithubRun, type GithubSnapshot } from '@matrix-bridge/core';
-import { apiNotices, getSettings, player, updateSettings, type ConnectorSettings } from './bridge';
+import { apiNotices, getSettings, noticeSpeed, player, updateSettings, type ConnectorSettings } from './bridge';
 import { githubGet } from './native';
 
 export type Notice = { from: string; text: string; at: number };
@@ -41,7 +41,7 @@ export function useConnectors(): ConnectorState {
 
 /** Shows a notice on the matrix and keeps it in the recent list. */
 export function notify(from: string, text: string): void {
-  player.notify(noticeSource(text));
+  player.notify(noticeSource(text, noticeSpeed));
   publish({ recent: [{ from, text, at: Date.now() }, ...state.recent].slice(0, 6) });
 }
 

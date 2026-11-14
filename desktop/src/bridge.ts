@@ -69,6 +69,8 @@ export type Settings = {
   /** Where the island sits: 0-2 along the top (left, centre, right), 3-5 along the bottom. */
   islandPlace: number;
   widgets: WidgetSettings;
+  /** Master speed for everything that scrolls: milliseconds per step, lower is faster. */
+  textSpeed: number;
   /** A patch of dot matrix that follows the pointer around the main window. */
   cursorDots: boolean;
   /** Its radius in pixels. */
@@ -94,6 +96,7 @@ const DEFAULTS: Settings = {
     game: { enabled: false, token: '' },
   },
   widgets: { ticker: ['BTC-USD', 'ETH-USD', 'AAPL'], weather: null, hour12: false, rotation: ['clock', 'system meter', 'load graph', 'visualiser'] },
+  textSpeed: 60,
   cursorDots: true,
   cursorRadius: 110,
   island: true,
@@ -194,6 +197,11 @@ export function getState(): BridgeState {
 }
 
 /** For code outside React (connectors, widgets). */
+/** The master text speed, as a function, so text that is already scrolling follows the slider. */
+export const textSpeed = (): number => state.settings.textSpeed;
+/** Notices pass a little quicker than ordinary text. */
+export const noticeSpeed = (): number => state.settings.textSpeed * 0.75;
+
 export function getSettings(): Settings {
   return state.settings;
 }
@@ -347,7 +355,8 @@ async function handleApi(request: ApiRequest): Promise<void> {
         const text = typeof body.text === 'string' ? body.text : '';
         if (!text) return;
         const loops = typeof body.loops === 'number' && body.loops > 0 ? body.loops : Infinity;
-        const speedMs = typeof body.speedMs === 'number' ? Math.max(20, Math.min(1000, body.speedMs)) : 60;
+        // No speed given: follow the master speed, live.
+        const speedMs = typeof body.speedMs === 'number' ? Math.max(20, Math.min(1000, body.speedMs)) : textSpeed;
         void player.play(textSource(text, { loops, speedMs, hold: true }));
         break;
       }
@@ -356,7 +365,7 @@ async function handleApi(request: ApiRequest): Promise<void> {
         if (!text) return;
         // connectors.ts listens here so script notices show up in its recent list too.
         if (apiNotices.size > 0) apiNotices.forEach((fn) => fn(text));
-        else player.notify(noticeSource(text));
+        else player.notify(noticeSource(text, noticeSpeed));
         break;
       }
       case '/frame':

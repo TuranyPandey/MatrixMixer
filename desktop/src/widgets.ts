@@ -20,7 +20,7 @@ import {
   type Quote,
   type WeatherKind,
 } from '@matrix-bridge/core';
-import { clearMatrix, getSettings, player, registerAction, updateSettings } from './bridge';
+import { clearMatrix, getSettings, player, registerAction, textSpeed, updateSettings } from './bridge';
 import { audioBands, fetchText, systemStats } from './native';
 
 /** The widgets that are simply on or off, by the name after "widget: " in the player's label. */
@@ -183,7 +183,7 @@ export async function startTicker(): Promise<string | null> {
   const symbols = getSettings().widgets.ticker;
   if (symbols.length === 0) return 'Add a symbol first.';
   const load = async () => (await Promise.allSettled(symbols.map(quote))).flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
-  const show = (quotes: Quote[]) => void player.play({ ...textSource(tickerLine(quotes), { speedMs: 55 }), label: TICKER_LABEL });
+  const show = (quotes: Quote[]) => void player.play(textSource(tickerLine(quotes), { speedMs: textSpeed, label: TICKER_LABEL }));
   const quotes = await load();
   if (quotes.length === 0) return 'Could not fetch any prices. Check the symbols and your connection.';
   show(quotes);
