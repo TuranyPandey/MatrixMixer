@@ -202,6 +202,18 @@ export const textSpeed = (): number => state.settings.textSpeed;
 /** Notices pass a little quicker than ordinary text. */
 export const noticeSpeed = (): number => state.settings.textSpeed * 0.75;
 
+/**
+ * Sends text to the matrix. A set number of passes goes over whatever is
+ * showing and then hands the matrix back to it (or leaves it dark if nothing
+ * was). "Forever" replaces what is showing, like any other source.
+ */
+export function sendText(text: string, options: { loops?: number; speedMs?: number | (() => number) } = {}): void {
+  const { loops = 1, speedMs = textSpeed } = options;
+  const source = textSource(text, { loops, speedMs });
+  if (Number.isFinite(loops)) player.interject(source);
+  else void player.play(source);
+}
+
 export function getSettings(): Settings {
   return state.settings;
 }
@@ -357,7 +369,7 @@ async function handleApi(request: ApiRequest): Promise<void> {
         const loops = typeof body.loops === 'number' && body.loops > 0 ? body.loops : Infinity;
         // No speed given: follow the master speed, live.
         const speedMs = typeof body.speedMs === 'number' ? Math.max(20, Math.min(1000, body.speedMs)) : textSpeed;
-        void player.play(textSource(text, { loops, speedMs, hold: true }));
+        sendText(text, { loops, speedMs });
         break;
       }
       case '/notify': {

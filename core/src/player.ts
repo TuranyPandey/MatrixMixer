@@ -123,6 +123,8 @@ export class Player {
   /** Notices waiting their turn, and a counter that changes whenever the user takes the matrix back. */
   private notices: Source[] = [];
   private noticing = false;
+  /** What to go back to when the notices are done. */
+  private resumeTo: Source | null = null;
   private turn = 0;
 
   /** The most recent frame, for late subscribers. */
@@ -157,24 +159,38 @@ export class Player {
    */
   notify(source: Source): void {
     this.notices.push(source);
-    if (!this.noticing) void this.runNotices();
+    if (!this.noticing) void this.runNotices(this.source);
   }
 
-  private async runNotices(): Promise<void> {
+  /**
+   * Like `notify`, but takes over at once instead of waiting its turn: any
+   * notice showing or queued is dropped. What was playing before them still
+   * comes back afterwards. For a message someone just sent by hand: it passes
+   * once over the clock (or whatever is up) and the clock returns.
+   */
+  interject(source: Source): void {
+    const resume = this.noticing ? this.resumeTo : this.source;
+    this.notices = [source];
+    void this.runNotices(resume);
+  }
+
+  private async runNotices(resume: Source | null): Promise<void> {
     const turn = ++this.turn;
     this.noticing = true;
-    const resume = this.source;
+    this.resumeTo = resume;
     while (this.notices.length > 0) {
       await this.start(this.notices.shift()!);
       if (turn !== this.turn) return;
     }
     this.noticing = false;
+    this.resumeTo = null;
     if (resume) void this.start(resume);
   }
 
   private dropNotices(): void {
     this.notices = [];
     this.noticing = false;
+    this.resumeTo = null;
     this.turn++;
   }
 

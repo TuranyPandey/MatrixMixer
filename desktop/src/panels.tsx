@@ -8,7 +8,6 @@ import {
   animationSource,
   applyMask,
   blankFrame,
-  textSource,
   type ButtonAction,
   type Frame,
   type ImageOptions,
@@ -21,7 +20,7 @@ import {
   pair,
   player,
   runBinding,
-  textSpeed,
+  sendText,
   updateSettings,
   useBridge,
   type ActionKind,
@@ -235,8 +234,8 @@ export function TextPanel(_: PanelProps) {
   const [loops, setLoops] = useState('1');
   const send = (value = text) => {
     if (!value.trim()) return;
-    // When the passes are over the text stays on the matrix until something replaces it.
-    void player.play(textSource(value, { speedMs: textSpeed, hold: true, loops: loops === 'forever' ? Infinity : Number(loops) }));
+    // A set number of passes goes over what is showing, then gives the matrix back to it.
+    sendText(value, { loops: loops === 'forever' ? Infinity : Number(loops) });
   };
   return (
     <>
@@ -275,7 +274,7 @@ export function TextPanel(_: PanelProps) {
           ))}
         </div>
         <p className="hint">
-          Short text that fits is shown still. Longer text scrolls past, then stays up until you clear it or send something else. How fast it scrolls is the Text speed slider next to the matrix.
+          It passes over whatever is showing, then that comes back: a widget stays on until you take it off. Keep scrolling replaces it instead. Speed is the Text speed slider next to the matrix.
         </p>
       </Section>
     </>

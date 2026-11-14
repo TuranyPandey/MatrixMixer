@@ -258,6 +258,24 @@ describe('player', () => {
     player.stop();
   });
 
+  it('an interjected message replaces a notice in progress and still hands back to what was playing', async () => {
+    const player = new Player();
+    const labels: (string | null)[] = [];
+    player.onSourceChange((l) => labels.push(l));
+    const finite = (label: string, ticks: number) => ({ label, intervalMs: 1, next: (t: number) => (t < ticks ? blankFrame() : null) });
+    void player.play({ label: 'widget: clock', intervalMs: 1000, next: () => blankFrame() });
+    player.interject(finite('text: one', 500));
+    player.interject(finite('text: two', 3));
+    await new Promise((r) => setTimeout(r, 80));
+    expect(player.label).toBe('widget: clock');
+    expect(labels.filter((l) => l?.startsWith('text'))).toEqual(['text: one', 'text: two']);
+    // With nothing playing, the matrix simply goes dark afterwards.
+    player.stop();
+    player.interject(finite('text: three', 3));
+    await new Promise((r) => setTimeout(r, 60));
+    expect(player.label).toBeNull();
+  });
+
   it('a notice blinks the ring, passes once and ends', () => {
     const source = noticeSource('HI');
     let ticks = 0;
