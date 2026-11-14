@@ -28,7 +28,9 @@ export type ActionKind =
   | 'mute_volume'
   | 'mute_mic'
   | 'lock'
-  | 'command';
+  | 'command'
+  /** Step to the next widget in `widgets.rotation`. Runs in this app, not as a system action. */
+  | 'next_widget';
 export type ButtonBinding = { kind: ActionKind; command: string };
 
 /** Things that reach the matrix on their own. See connectors.ts. */
@@ -51,6 +53,8 @@ export type WidgetSettings = {
   weather: { place: string; latitude: number; longitude: number; fahrenheit: boolean } | null;
   /** Clock widget: 12-hour instead of 24-hour. */
   hour12: boolean;
+  /** Widgets the Glyph Button steps through with its "Next widget" action, in order. */
+  rotation: string[];
 };
 
 export type Settings = {
@@ -89,7 +93,7 @@ const DEFAULTS: Settings = {
     calendar: { enabled: false, url: '', lead: 10 },
     game: { enabled: false, token: '' },
   },
-  widgets: { ticker: ['BTC-USD', 'ETH-USD', 'AAPL'], weather: null, hour12: false },
+  widgets: { ticker: ['BTC-USD', 'ETH-USD', 'AAPL'], weather: null, hour12: false, rotation: ['clock', 'system meter', 'load graph', 'visualiser'] },
   cursorDots: true,
   cursorRadius: 110,
   island: true,
@@ -274,13 +278,32 @@ export function clearMatrix(): void {
   client?.clear();
 }
 
+/** Actions carried out inside this app instead of by the system (see `registerAction`). */
+const localActions = new Map<string, () => Promise<string>>();
+
+/**
+ * Lets another module provide a button action. widgets.ts uses this for
+ * "Next widget": it imports this file, so this file cannot import it back.
+ * The function resolves with a few words for the "Last:" line.
+ */
+export function registerAction(kind: ActionKind, run: () => Promise<string>): void {
+  localActions.set(kind, run);
+}
+
+/** Runs what a gesture is bound to. Resolves with a few words on what happened. */
+export async function runBinding(binding: ButtonBinding): Promise<string> {
+  const local = localActions.get(binding.kind);
+  if (local) return local();
+  await runAction(binding.kind, binding.command);
+  return 'Done';
+}
+
 async function handleButton(action: ButtonAction): Promise<void> {
   const binding = state.settings.buttons[action];
   let result = 'No action set';
   if (binding.kind !== 'none') {
     try {
-      await runAction(binding.kind, binding.command);
-      result = 'Done';
+      result = await runBinding(binding);
     } catch (err) {
       result = err instanceof Error ? err.message : String(err);
     }

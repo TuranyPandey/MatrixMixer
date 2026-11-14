@@ -20,13 +20,15 @@ import {
   forgetPhone,
   pair,
   player,
+  runBinding,
   updateSettings,
   useBridge,
   type ActionKind,
 } from './bridge';
 import { DotText } from './DotText';
 import { MatrixView } from './MatrixView';
-import { apiInfo, discoverPhones, isTauri, runAction, type ApiInfo, type FoundPhone } from './native';
+import { apiInfo, discoverPhones, isTauri, type ApiInfo, type FoundPhone } from './native';
+import { ROTATABLE } from './widgets';
 
 type PanelProps = { go: (tab: string) => void };
 
@@ -602,6 +604,7 @@ export function ImagePanel(_: PanelProps) {
 
 const ACTIONS: Array<{ kind: ActionKind; label: string }> = [
   { kind: 'none', label: 'Do nothing' },
+  { kind: 'next_widget', label: 'Next widget' },
   { kind: 'play_pause', label: 'Play / pause media' },
   { kind: 'next_track', label: 'Next track' },
   { kind: 'previous_track', label: 'Previous track' },
@@ -621,6 +624,8 @@ export function ButtonsPanel(_: PanelProps) {
   const bridge = useBridge();
   const [testResult, setTestResult] = useState<string | null>(null);
   const { buttons } = bridge.settings;
+  const { widgets } = bridge.settings;
+  const usesNext = Object.values(buttons).some((b) => b.kind === 'next_widget');
   const setBinding = (action: ButtonAction, patch: Partial<{ kind: ActionKind; command: string }>) =>
     updateSettings({ buttons: { ...buttons, [action]: { ...buttons[action], ...patch } } });
 
@@ -682,8 +687,8 @@ export function ButtonsPanel(_: PanelProps) {
                 disabled={binding.kind === 'none'}
                 onClick={() => {
                   setTestResult(null);
-                  runAction(binding.kind, binding.command).then(
-                    () => setTestResult(`${label}: ran`),
+                  runBinding(binding).then(
+                    (result) => setTestResult(`${label}: ${result === 'Done' ? 'ran' : result}`),
                     (err) => setTestResult(`${label}: ${err instanceof Error ? err.message : String(err)}`),
                   );
                 }}
@@ -696,6 +701,37 @@ export function ButtonsPanel(_: PanelProps) {
         {testResult && <p className="mono muted">{testResult}</p>}
         <p className="hint">
           Commands run on this PC with your user account, exactly as typed. Only add ones you would run yourself.
+        </p>
+      </Section>
+
+      <Section title="Next widget">
+        <p>
+          Bind a gesture to "Next widget" and each press steps the matrix to the next one of these, so you can flip
+          through them from the back of the phone without touching the PC.
+        </p>
+        <div className="row wrap">
+          {ROTATABLE.map((w) => {
+            const on = widgets.rotation.includes(w.name);
+            return (
+              <button
+                key={w.name}
+                className={on ? 'chip on' : 'chip'}
+                aria-pressed={on}
+                onClick={() =>
+                  updateSettings({
+                    widgets: { ...widgets, rotation: on ? widgets.rotation.filter((n) => n !== w.name) : [...widgets.rotation, w.name] },
+                  })
+                }
+              >
+                {w.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="hint">
+          {usesNext
+            ? 'They come round in the order shown here. Ticker and Weather are skipped until they are set up in Widgets.'
+            : 'No gesture is set to "Next widget" yet. Long-press is the one to use.'}
         </p>
       </Section>
     </>

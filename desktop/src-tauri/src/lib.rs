@@ -100,7 +100,7 @@ fn pc_name() -> String {
 /// hover panel on its Widgets tab, which needs more room.
 const ISLAND_COMPACT: (f64, f64) = (250.0, 42.0);
 const ISLAND_EXPANDED: (f64, f64) = (400.0, 232.0);
-const ISLAND_TALL: (f64, f64) = (400.0, 306.0);
+const ISLAND_TALL: (f64, f64) = (400.0, 276.0);
 /// Gap between the island and the edge of the screen, in logical pixels.
 const ISLAND_MARGIN: f64 = 8.0;
 

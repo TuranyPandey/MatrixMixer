@@ -49,11 +49,14 @@ export function startIslandHost(): void {
   };
 
   // Readings for the island's Widgets tab, gathered only while it is on screen.
-  const live: IslandLive = { cpu: null, ram: null, quotes: null, weather: null, timer: null };
+  const live: IslandLive = { cpu: null, ram: null, quotes: null, weather: null, timer: null, hour12: false, symbol: null };
   let watching: ReturnType<typeof setInterval> | null = null;
   const sendLive = () => {
     const t = getTimer();
-    live.timer = t && { remaining: t.remaining, phase: t.phase, running: t.running };
+    live.timer = t && { remaining: t.remaining, total: t.total, phase: t.phase, running: t.running };
+    const { hour12, ticker } = getState().settings.widgets;
+    live.hour12 = hour12;
+    live.symbol = ticker[0] ?? null;
     send('island:to', { t: 'live', live });
   };
   const read = () => {

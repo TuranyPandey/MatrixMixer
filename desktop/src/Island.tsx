@@ -11,6 +11,7 @@ import { receive, send, type IslandLive, type IslandState, type IslandWidget } f
 import { MatrixView } from './MatrixView';
 import { isTauri } from './native';
 import { describeShowing, showingLine } from './showing';
+import { SHELF, previewFrames, type ShelfId } from './widgetPreviews';
 
 const STATUS: Record<ConnectionState, string> = {
   offline: 'No phone on the line',
@@ -23,38 +24,16 @@ const STATUS: Record<ConnectionState, string> = {
 /** How long the pointer may be away before the panel folds up. */
 const FOLD_MS = 350;
 
-/** One line of the Widgets tab: a live reading. Clicking it puts that widget on the matrix, or takes it off. */
-function Reading(props: {
-  name: string;
-  on: boolean;
-  disabled?: boolean;
-  title?: string;
-  onClick: () => void;
-  children: React.ReactNode;
-  extra?: React.ReactNode;
-}) {
-  return (
-    <div className={props.on ? 'island-row on' : 'island-row'}>
-      <button
-        className="read"
-        aria-pressed={props.on}
-        disabled={props.disabled}
-        title={props.title ?? (props.on ? 'On the matrix. Click to take it off' : 'Click to put it on the matrix')}
-        onClick={props.onClick}
-      >
-        <span className="pip" aria-hidden="true" />
-        <span className="name">{props.name}</span>
-        {props.children}
-      </button>
-      {props.extra}
-    </div>
-  );
-}
-
+/**
+ * The Widgets tab: the same shelf of small live matrices as the main window.
+ * Clicking one puts it on the matrix (again takes it off); the line under the
+ * shelf reads out the one you last pointed at.
+ */
 function Widgets({ live, playing, notReady }: { live: IslandLive | null; playing: string | null; notReady: IslandWidget[] }) {
   const [now, setNow] = useState(() => new Date());
   const history = useRef<number[]>([]);
-  const [, redraw] = useState(0);
+  const showing = playing?.startsWith('widget: ') ? (playing.slice(8) as ShelfId) : null;
+  const [focus, setFocus] = useState<ShelfId>(showing ?? 'clock');
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 1000);
@@ -62,95 +41,82 @@ function Widgets({ live, playing, notReady }: { live: IslandLive | null; playing
   }, []);
 
   // One reading arrives a second; keep the last 25 for the graph, like the matrix does.
+  const cpu = live?.cpu ?? null;
   useEffect(() => {
-    if (live?.cpu == null) return;
-    history.current = [...history.current, live.cpu].slice(-25);
-    redraw((n) => n + 1);
-  }, [live]);
+    if (cpu !== null) history.current = [...history.current, cpu].slice(-25);
+    // Deliberately on every reading, not only when the number changes.
+  }, [live, cpu]);
 
-  const on = (name: IslandWidget) => playing === `widget: ${name}`;
-  const toggle = (name: IslandWidget) => () => send('island:from', { t: 'widget', name });
-  const quiet = (text: string) => <span className="value quiet">{text}</span>;
+  const timer = live?.timer ?? null;
+  const frames = previewFrames({
+    now,
+    hour12: live?.hour12 ?? false,
+    timer,
+    cpu: cpu ?? 0,
+    ram: live?.ram ?? 0,
+    history: history.current,
+    symbol: live?.symbol ?? null,
+    weather: live?.weather ?? null,
+  });
 
-  const fetched = live?.quotes != null;
+  const blocked = (id: ShelfId) => id !== 'timer' && id !== showing && notReady.includes(id);
+  const click = (id: ShelfId) => {
+    setFocus(id);
+    if (id !== 'timer') send('island:from', { t: 'widget', name: id });
+    else send('island:from', { t: 'timer', do: !timer ? 'start' : timer.phase === 'done' ? 'stop' : 'toggle' });
+  };
+
   const quotes = live?.quotes ?? [];
   // With several symbols, step through them every three seconds.
   const quote = quotes.length > 0 ? quotes[Math.floor(now.getTime() / 3000) % quotes.length]! : null;
   const weather = live?.weather ?? null;
-  const timer = live?.timer ?? null;
+  const reading: Record<ShelfId, string> = {
+    clock: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: live?.hour12 ?? false }),
+    timer: !timer
+      ? 'Click to start 25 minutes of focus'
+      : timer.phase === 'done'
+        ? "Time's up. Click to dismiss"
+        : `${timer.phase === 'break' ? 'Break ' : ''}${formatDuration(timer.remaining)}${timer.running ? '' : ' paused'}`,
+    'system meter': cpu === null ? 'Reading' : `CPU ${cpu}%  RAM ${live?.ram ?? 0}%`,
+    'load graph': cpu === null ? 'Reading' : `CPU ${cpu}% now, last 25 seconds`,
+    visualiser: showing === 'visualiser' ? 'Playing' : 'Spectrum of what this PC plays',
+    ticker: notReady.includes('ticker') ? 'Add symbols in the app first' : quote ? tickerLine([quote]) : live?.quotes != null ? 'No prices' : 'Fetching',
+    weather: notReady.includes('weather')
+      ? 'Set a place in the app first'
+      : weather
+        ? `${weather.place}  ${Math.round(weather.temperature)}\u00b0${weather.fahrenheit ? 'F' : 'C'}`
+        : 'Fetching',
+  };
+  const name = SHELF.find((w) => w.id === focus)!.name;
 
   return (
     <div className="island-widgets">
-      <Reading name="Clock" on={on('clock')} onClick={toggle('clock')}>
-        <span className="value">{now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}</span>
-      </Reading>
-
-      <Reading
-        name="Timer"
-        on={playing === 'widget: timer'}
-        title={!timer ? 'Start a 25 minute focus timer' : timer.phase === 'done' ? 'Dismiss' : timer.running ? 'Pause' : 'Resume'}
-        onClick={() => send('island:from', { t: 'timer', do: !timer ? 'start' : timer.phase === 'done' ? 'stop' : 'toggle' })}
-        extra={
-          timer &&
-          timer.phase !== 'done' && (
-            <button className="stop" aria-label="Stop timer" title="Stop timer" onClick={() => send('island:from', { t: 'timer', do: 'stop' })}>
-              x
-            </button>
-          )
-        }
-      >
-        {!timer ? (
-          quiet('Start 25:00')
-        ) : timer.phase === 'done' ? (
-          <span className="value">Time's up</span>
-        ) : (
-          <span className={timer.running ? 'value' : 'value quiet'}>
-            {timer.phase === 'break' ? 'Break ' : ''}
-            {formatDuration(timer.remaining)}
-            {timer.running ? '' : ' paused'}
-          </span>
+      <div className="island-shelf" role="listbox" aria-label="Widgets">
+        {SHELF.map((w) => (
+          <button
+            key={w.id}
+            role="option"
+            aria-selected={w.id === showing}
+            aria-label={w.name}
+            className={`island-item${w.id === showing ? ' on' : ''}${w.id === focus ? ' focus' : ''}`}
+            disabled={blocked(w.id)}
+            onMouseEnter={() => setFocus(w.id)}
+            onFocus={() => setFocus(w.id)}
+            onClick={() => click(w.id)}
+          >
+            <MatrixView frame={frames[w.id]} size={40} label={`${w.name} preview`} />
+          </button>
+        ))}
+      </div>
+      <div className={focus === showing ? 'island-read on' : 'island-read'}>
+        <span className="name">{name}</span>
+        <span className="value">{reading[focus]}</span>
+        {focus === 'timer' && timer && timer.phase !== 'done' && (
+          <button className="stop" aria-label="Stop timer" title="Stop timer" onClick={() => send('island:from', { t: 'timer', do: 'stop' })}>
+            Stop
+          </button>
         )}
-      </Reading>
-
-      <Reading name="System" on={on('system meter')} onClick={toggle('system meter')}>
-        {live?.cpu == null ? quiet('Reading') : <span className="value">{`CPU ${live.cpu}%  RAM ${live.ram}%`}</span>}
-      </Reading>
-
-      <Reading name="Load" on={on('load graph')} onClick={toggle('load graph')}>
-        <span className="island-spark" aria-label="CPU load over the last 25 seconds">
-          {history.current.map((v, i) => (
-            <i key={i} style={{ height: `${Math.max(4, Math.min(100, v))}%` }} />
-          ))}
-        </span>
-      </Reading>
-
-      <Reading
-        name="Ticker"
-        on={on('ticker')}
-        disabled={!on('ticker') && notReady.includes('ticker')}
-        title={notReady.includes('ticker') ? 'Add symbols in the app first' : undefined}
-        onClick={toggle('ticker')}
-      >
-        {notReady.includes('ticker') ? quiet('No symbols') : quote ? <span className="value">{tickerLine([quote])}</span> : quiet(fetched ? 'No prices' : 'Fetching')}
-      </Reading>
-
-      <Reading
-        name="Weather"
-        on={on('weather')}
-        disabled={!on('weather') && notReady.includes('weather')}
-        title={notReady.includes('weather') ? 'Set a place in the app first' : weather ? weather.place : undefined}
-        onClick={toggle('weather')}
-      >
-        {notReady.includes('weather')
-          ? quiet('No place set')
-          : weather
-            ? <span className="value">{`${weather.kind} ${Math.round(weather.temperature)}\u00b0${weather.fahrenheit ? 'F' : 'C'}`}</span>
-            : quiet('Fetching')}
-      </Reading>
-
-      <Reading name="Visualiser" on={on('visualiser')} onClick={toggle('visualiser')}>
-        {quiet(on('visualiser') ? 'Playing' : 'Spectrum')}
-      </Reading>
+      </div>
     </div>
   );
 }

@@ -5,22 +5,11 @@
  * a time instead of a page of every option for every widget.
  */
 import { useEffect, useRef, useState } from 'react';
-import {
-  alarmFrame,
-  clockFrame,
-  formatDuration,
-  graphFrame,
-  meterFrame,
-  renderText,
-  spectrumFrame,
-  staticTextFrame,
-  timerFrame,
-  weatherFrame,
-  type Frame,
-} from '@matrix-bridge/core';
+import { formatDuration, type Frame } from '@matrix-bridge/core';
 import { clearMatrix, player, updateSettings, useBridge } from './bridge';
 import { MatrixView } from './MatrixView';
 import { isTauri, systemStats } from './native';
+import { SHELF, previewFrames, type ShelfId } from './widgetPreviews';
 import {
   latestWeather,
   setWeatherPlace,
@@ -37,26 +26,10 @@ import {
   useTimer,
   type TimerState,
   type WeatherNow,
-  type WidgetName,
 } from './widgets';
 
-type ShelfId = WidgetName | 'timer';
-
-const SHELF: Array<{ id: ShelfId; name: string; about: string }> = [
-  { id: 'clock', name: 'Clock', about: 'The time, big enough to read from across the desk.' },
-  { id: 'timer', name: 'Timer', about: 'A Pomodoro or a plain countdown. The ring drains as time runs out; break time is dimmer than focus time.' },
-  { id: 'system meter', name: 'System', about: 'Ring and number show CPU load. The bar underneath is memory in use.' },
-  { id: 'load graph', name: 'Load', about: 'CPU load over the last 25 seconds as a bar chart, newest on the right.' },
-  { id: 'visualiser', name: 'Visualiser', about: 'A spectrum of whatever this PC is playing: bass on the left, treble on the right, with caps that hang on the hits.' },
-  { id: 'ticker', name: 'Ticker', about: "Prices scroll past with today's change, refreshed every minute." },
-  { id: 'weather', name: 'Weather', about: 'A small picture of the sky with the temperature under it, refreshed every 15 minutes.' },
-];
-
-/** A spectrum that looks like music, for the shelf. The real one only runs when shown. */
-const SAMPLE_BANDS = [0.5, 0.82, 0.95, 0.7, 0.58, 0.74, 0.46, 0.36, 0.5, 0.3, 0.2, 0.12];
-
 /** What each widget would look like right now, for the shelf. */
-function usePreviews(hour12: boolean, timer: TimerState | null, firstSymbol: string | undefined): Record<ShelfId, Frame> {
+function usePreviews(hour12: boolean, timer: TimerState | null, symbol: string | undefined): Record<ShelfId, Frame> {
   const [now, setNow] = useState(() => new Date());
   const [stats, setStats] = useState({ cpu: 0, ram: 0 });
   const history = useRef<number[]>([]);
@@ -88,19 +61,7 @@ function usePreviews(hour12: boolean, timer: TimerState | null, firstSymbol: str
     };
   }, [weatherSet]);
 
-  return {
-    clock: clockFrame(now, hour12),
-    timer: !timer
-      ? timerFrame(25 * 60 * 0.7, 25 * 60)
-      : timer.phase === 'done'
-        ? alarmFrame(now.getSeconds())
-        : timerFrame(timer.remaining, timer.total, timer.phase === 'break'),
-    'system meter': meterFrame(stats.cpu, stats.ram),
-    'load graph': graphFrame(history.current),
-    visualiser: spectrumFrame(SAMPLE_BANDS, SAMPLE_BANDS),
-    ticker: staticTextFrame(renderText((firstSymbol ?? 'BTC').replace(/-USD$|\..*$/, '').slice(0, 4))),
-    weather: weather && weatherSet ? weatherFrame(weather.temperature, weather.kind) : weatherFrame(21, 'clear'),
-  };
+  return previewFrames({ now, hour12, timer, ...stats, history: history.current, symbol: symbol ?? null, weather: weatherSet ? weather : null });
 }
 
 export function WidgetsPanel(_: { go: (tab: string) => void }) {

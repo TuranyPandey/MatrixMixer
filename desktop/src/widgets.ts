@@ -20,7 +20,7 @@ import {
   type Quote,
   type WeatherKind,
 } from '@matrix-bridge/core';
-import { clearMatrix, getSettings, player, updateSettings } from './bridge';
+import { clearMatrix, getSettings, player, registerAction, updateSettings } from './bridge';
 import { audioBands, fetchText, systemStats } from './native';
 
 /** The widgets that are simply on or off, by the name after "widget: " in the player's label. */
@@ -54,6 +54,37 @@ export async function toggleWidget(name: WidgetName, options: { hour12?: boolean
       return startWeather();
   }
 }
+
+/** Widgets that can go in the Glyph Button's rotation, in shelf order. */
+export const ROTATABLE: Array<{ name: WidgetName; label: string }> = [
+  { name: 'clock', label: 'Clock' },
+  { name: 'system meter', label: 'System' },
+  { name: 'load graph', label: 'Load' },
+  { name: 'visualiser', label: 'Visualiser' },
+  { name: 'ticker', label: 'Ticker' },
+  { name: 'weather', label: 'Weather' },
+];
+
+/**
+ * Steps to the next widget in the rotation: the one after whatever is showing,
+ * or the first if something else (or nothing) is on the matrix. Widgets that
+ * are not set up yet (no ticker symbols, no weather place) or fail to start are skipped.
+ */
+export async function nextWidget(): Promise<string> {
+  const { rotation, ticker, weather, hour12 } = getSettings().widgets;
+  const names = ROTATABLE.map((w) => w.name).filter((n) => rotation.includes(n));
+  const usable = names.filter((n) => (n === 'ticker' ? ticker.length > 0 : n === 'weather' ? weather !== null : true));
+  if (usable.length === 0) throw new Error('No widgets chosen to step through');
+  const at = usable.findIndex((n) => player.label === `widget: ${n}`);
+  for (let step = 1; step <= usable.length; step++) {
+    const name = usable[(at + step) % usable.length]!;
+    if (player.label === `widget: ${name}`) break; // came all the way round
+    const problem = await toggleWidget(name, { hour12 }).catch((err) => String(err));
+    if (!problem) return ROTATABLE.find((w) => w.name === name)!.label;
+  }
+  throw new Error('None of the chosen widgets could start');
+}
+registerAction('next_widget', nextWidget);
 
 export function startClock(hour12: boolean): void {
   void player.play(liveSource('widget: clock', 500, () => clockFrame(new Date(), hour12)));

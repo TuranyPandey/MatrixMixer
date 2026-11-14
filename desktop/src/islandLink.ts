@@ -36,7 +36,10 @@ export type IslandLive = {
   /** Null until the first answer; empty if no price could be fetched. */
   quotes: { symbol: string; price: number; changePercent?: number | null }[] | null;
   weather: { place: string; temperature: number; kind: string; fahrenheit: boolean } | null;
-  timer: { remaining: number; phase: 'focus' | 'break' | 'done'; running: boolean } | null;
+  timer: { remaining: number; total: number; phase: 'focus' | 'break' | 'done'; running: boolean } | null;
+  /** The clock widget's 12-hour setting, and the first ticker symbol, for the previews. */
+  hour12: boolean;
+  symbol: string | null;
 };
 
 /** Main window to island. */
