@@ -33,7 +33,7 @@ Notices pass once, then hand the matrix back to whatever was showing.
 
 **The island**
 
-A small always-on-top pill on your PC desktop mirrors the matrix. Hover it for brightness, a quick message box and Clear. Put it in any of six spots, or switch it off.
+A small always-on-top pill on your PC desktop mirrors the matrix. Hover it for brightness, a quick message box, Clear, and a shelf of widgets with live readings. Put it in any of six spots, or switch it off.
 
 <img src="docs/images/island-open.png" width="400" alt="The island opened on hover: live matrix, status, brightness and a message box">
 
@@ -92,7 +92,7 @@ Own a Glyph Matrix phone that is not on this list? [Open an issue](../../issues)
 
 ## Using the Glyph Button
 
-Nothing OS only shares the Glyph Button with the Glyph Toy that is currently selected. Add the **PC Remote** toy in Settings > Glyph Interface > Glyph Toys, then short-press the Glyph Button until its two-headed arrow shows. From then on a long-press triggers the action you picked in the PC app's **Button** tab. A short press is never delivered to apps; it moves on to the next toy.
+Nothing OS only shares the Glyph Button with the Glyph Toy that is currently selected. Add the **PC Remote** toy in Settings > Glyph Interface > Glyph Toys, then short-press the Glyph Button until its two-headed arrow shows. From then on a long-press triggers the action you picked in the PC app's **Glyph Button** tab. A short press is never delivered to apps; it moves on to the next toy.
 
 ## Command line
 

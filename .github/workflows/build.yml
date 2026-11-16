@@ -39,6 +39,11 @@ jobs:
       - name: Unit tests and APK
         working-directory: android
         run: ./gradlew --no-daemon testDebugUnitTest assembleRelease
+      - name: Name the APK after the product and version
+        run: |
+          v=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' android/app/build.gradle.kts)
+          cd android/app/build/outputs/apk/release
+          mv app-release.apk "MatrixMixer_${v}_android.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: matrix-bridge-phone
@@ -78,5 +83,28 @@ jobs:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/*
+          files: |
+            artifacts/*.exe
+            artifacts/*.apk
+          fail_on_unmatched_files: true
           generate_release_notes: true
+          body: |
+            ## Downloads
+
+            | For | File |
+            |---|---|
+            | Windows PC (10 or 11, 64-bit) | `MatrixMixer_*_x64-setup.exe` |
+            | Nothing Phone (3) | `MatrixMixer_*_android.apk` |
+
+            You need both: the PC app decides what the matrix shows, the phone app draws it.
+
+            ## Install
+
+            1. On the phone, open the APK and allow installing from your browser or file manager. Open **MatrixMixer** and tap **Start**.
+            2. On the PC, run the installer. Windows may show "Windows protected your PC" because the installer is not code-signed: choose **More info**, then **Run anyway**.
+            3. In the PC app, press **Search this network** and type the 6-digit code shown on the phone.
+
+            Updating the phone app from an earlier release: uninstall the old one first. Release builds are not signed with a stable key yet, so Android refuses to install one over another.
+
+            Full setup, including USB for networks that block device discovery: [docs/SETUP.md](https://github.com/${{ github.repository }}/blob/main/docs/SETUP.md)
+
