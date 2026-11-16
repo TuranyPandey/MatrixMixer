@@ -1,6 +1,7 @@
 import { framesEqual, type Frame } from './frame';
 import {
   DEFAULT_PORT,
+  MAX_STORED_FRAMES,
   PROTOCOL_VERSION,
   decodePhoneMessage,
   encode,
@@ -70,6 +71,10 @@ export type ClientEvents = {
   button: (action: ButtonAction) => void;
   /** The PC Remote toy was selected or deselected on the phone. */
   toy: (active: boolean) => void;
+  /** The phone saved the glyph sent with `store()`. */
+  stored: (name: string) => void;
+  /** The phone's own battery, 0-100. */
+  battery: (level: number, charging: boolean) => void;
   error: (code: ErrorCode | 'connect_failed' | 'version', message: string) => void;
 };
 
@@ -90,6 +95,8 @@ export class MatrixClient {
     paired: new Set(),
     button: new Set(),
     toy: new Set(),
+    stored: new Set(),
+    battery: new Set(),
     error: new Set(),
   };
   private wanted = false;
@@ -192,6 +199,17 @@ export class MatrixClient {
     if (this.state === 'connected') this.sendRaw({ t: 'clear' });
   }
 
+  /**
+   * Asks the phone to keep a picture or animation, to show with no PC connected.
+   * Answered with a `stored` event. Returns false if there is no connection to send it on.
+   */
+  store(name: string, frames: Frame[], delayMs: number): boolean {
+    if (this.state !== 'connected' || frames.length === 0) return false;
+    const delay = Math.max(50, Math.min(1000, Math.round(delayMs)));
+    this.sendRaw({ t: 'store', name: name.slice(0, 40), frames: frames.slice(0, MAX_STORED_FRAMES).map((f) => Array.from(f)), delay });
+    return true;
+  }
+
   /** Resolves once everything queued has been handed to the socket. */
   async flush(): Promise<void> {
     while (this.frameTimer) await new Promise((r) => setTimeout(r, 10));
@@ -281,6 +299,12 @@ export class MatrixClient {
       case 'status':
         this.toyActive = msg.toy;
         this.emit('toy', msg.toy);
+        break;
+      case 'stored':
+        this.emit('stored', msg.name);
+        break;
+      case 'battery':
+        this.emit('battery', msg.level, msg.charging);
         break;
       case 'pong':
         break;

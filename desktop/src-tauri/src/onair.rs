@@ -10,6 +10,8 @@ use serde::Serialize;
 pub struct InUse {
     pub mic: bool,
     pub camera: bool,
+    /// The system microphone is muted (see mic.rs). False when there is no microphone.
+    pub muted: bool,
 }
 
 /// True if any line of `reg query ... /v LastUsedTimeStop` output shows a zero stop time.
@@ -34,7 +36,7 @@ fn device_in_use(device: &str) -> bool {
 
 #[cfg(windows)]
 pub fn in_use() -> InUse {
-    InUse { mic: device_in_use("microphone"), camera: device_in_use("webcam") }
+    InUse { mic: device_in_use("microphone"), camera: device_in_use("webcam"), muted: crate::mic::muted().unwrap_or(false) }
 }
 
 #[cfg(not(windows))]

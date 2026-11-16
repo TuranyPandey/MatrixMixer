@@ -8,6 +8,7 @@ mod discovery;
 mod fetch;
 mod github;
 mod media;
+mod mic;
 mod onair;
 mod stats;
 
@@ -67,6 +68,12 @@ fn audio_bands() -> Vec<f32> {
 #[tauri::command]
 async fn on_air() -> Result<onair::InUse, String> {
     tauri::async_runtime::spawn_blocking(onair::in_use).await.map_err(|e| e.to_string())
+}
+
+/// Flips the system microphone's mute switch; answers true if it is now muted. See mic.rs.
+#[tauri::command]
+async fn mic_toggle() -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(mic::toggle).await.map_err(|e| e.to_string())?
 }
 
 /// Downloads an https link as text, for the calendar and ticker. See fetch.rs.
@@ -296,6 +303,7 @@ pub fn run() {
             now_playing,
             audio_bands,
             on_air,
+            mic_toggle,
             fetch_text,
             island_show,
             island_expand,

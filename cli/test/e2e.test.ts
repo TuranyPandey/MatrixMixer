@@ -158,3 +158,34 @@ describe('PC <-> phone over a real socket', () => {
     await until(c, 'pairing');
   }, 15000);
 });
+
+describe('things the phone keeps and reports', () => {
+  it('stores a glyph and says so, and reports its battery', async () => {
+    sim = await startSimulator({ port: 0, code: '123456' });
+    const c = client(sim.port);
+    const battery: number[] = [];
+    const stored: string[] = [];
+    c.on('battery', (level) => battery.push(level));
+    c.on('stored', (name) => stored.push(name));
+    c.connect();
+    await until(c, 'pairing');
+    c.pair('123456');
+    await until(c, 'connected');
+    await waitFor(() => battery.length === 1);
+
+    const frame = blankFrame();
+    frame[312] = 255;
+    expect(c.store('Wave', [frame, blankFrame()], 20_000)).toBe(true);
+    await waitFor(() => stored.length === 1);
+    expect(stored).toEqual(['Wave']);
+    // The delay is held to what the phone accepts.
+    expect(sim.stored).toMatchObject({ name: 'Wave', delay: 1000 });
+    expect(sim.stored!.frames).toHaveLength(2);
+    expect(sim.stored!.frames[0]![312]).toBe(255);
+  });
+
+  it('will not store without a connection', () => {
+    const c = client(1);
+    expect(c.store('Nope', [blankFrame()], 200)).toBe(false);
+  });
+});

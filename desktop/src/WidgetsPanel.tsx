@@ -6,7 +6,7 @@
  * Selecting never changes the matrix: looking through the shelf must not switch what the phone shows.
  */
 import { useEffect, useRef, useState } from 'react';
-import { formatDuration, type Frame } from '@matrix-bridge/core';
+import { AMBIENT_STYLES, formatDuration, type AmbientStyle, type Frame } from '@matrix-bridge/core';
 import { clearMatrix, player, updateSettings, useBridge } from './bridge';
 import { MatrixView } from './MatrixView';
 import { isTauri, systemStats } from './native';
@@ -15,6 +15,7 @@ import {
   latestWeather,
   setWeatherPlace,
   showTimer,
+  startAmbient,
   startClock,
   startCountdown,
   startPomodoro,
@@ -30,7 +31,7 @@ import {
 } from './widgets';
 
 /** What each widget would look like right now, for the shelf. */
-function usePreviews(hour12: boolean, timer: TimerState | null, symbol: string | undefined): Record<ShelfId, Frame> {
+function usePreviews(hour12: boolean, timer: TimerState | null, symbol: string | undefined, ambient: AmbientStyle): Record<ShelfId, Frame> {
   const [now, setNow] = useState(() => new Date());
   const [stats, setStats] = useState({ cpu: 0, ram: 0 });
   const history = useRef<number[]>([]);
@@ -62,7 +63,7 @@ function usePreviews(hour12: boolean, timer: TimerState | null, symbol: string |
     };
   }, [weatherSet]);
 
-  return previewFrames({ now, hour12, timer, ...stats, history: history.current, symbol: symbol ?? null, weather: weatherSet ? weather : null });
+  return previewFrames({ now, hour12, timer, ...stats, history: history.current, symbol: symbol ?? null, weather: weatherSet ? weather : null, ambient });
 }
 
 export function WidgetsPanel(_: { go: (tab: string) => void }) {
@@ -74,7 +75,7 @@ export function WidgetsPanel(_: { go: (tab: string) => void }) {
   // Open on whatever is on the matrix, so its options are right there.
   const [picked, setPicked] = useState<ShelfId>(showingId ?? 'clock');
   const [problem, setProblem] = useState<string | null>(null);
-  const previews = usePreviews(hour12, timer, widgets.ticker[0]);
+  const previews = usePreviews(hour12, timer, widgets.ticker[0], widgets.ambient);
 
   const ready = (id: ShelfId) => (id === 'ticker' ? widgets.ticker.length > 0 : id === 'weather' ? widgets.weather !== null : true);
 
@@ -144,6 +145,24 @@ export function WidgetsPanel(_: { go: (tab: string) => void }) {
         {picked === 'system meter' && !isTauri && <p className="hint">Running in a browser, so these numbers are made up. The desktop app reads real ones.</p>}
         {picked === 'visualiser' && (
           <p className="hint">It scales itself to the volume, so quiet playback still moves. The sound is analysed as it plays and never stored.</p>
+        )}
+        {picked === 'ambient' && (
+          <div className="row wrap" role="radiogroup" aria-label="Animation">
+            {AMBIENT_STYLES.map((s) => (
+              <button
+                key={s.id}
+                role="radio"
+                aria-checked={widgets.ambient === s.id}
+                className={widgets.ambient === s.id ? 'chip on' : 'chip'}
+                onClick={() => {
+                  updateSettings({ widgets: { ...widgets, ambient: s.id } });
+                  if (showingId === 'ambient') startAmbient();
+                }}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
         )}
         {picked === 'ticker' && <TickerOptions />}
         {picked === 'weather' && <WeatherOptions showing={isShowing} report={setProblem} />}

@@ -7,6 +7,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getActivity, onActivity } from './activities';
 import { clearMatrix, getState, player, sendText, setBrightness, subscribe, updateSettings } from './bridge';
 import { receive, send, type IslandLive, type IslandState, type IslandWidget } from './islandLink';
+import { library, onSaved, showImage } from './library';
 import { isTauri, systemStats } from './native';
 import { getTimer, latestQuotes, latestWeather, onTimer, startPomodoro, stopTimer, toggleTimer, toggleWidget } from './widgets';
 
@@ -48,13 +49,14 @@ export function startIslandHost(): void {
   };
 
   // Readings for the island's Widgets tab, gathered only while it is on screen.
-  const live: IslandLive = { cpu: null, ram: null, quotes: null, weather: null, timer: null, hour12: false, symbol: null };
+  const live: IslandLive = { cpu: null, ram: null, quotes: null, weather: null, timer: null, hour12: false, symbol: null, ambient: 'rain' };
   let watching: ReturnType<typeof setInterval> | null = null;
   const sendLive = () => {
     const t = getTimer();
     live.timer = t && { remaining: t.remaining, total: t.total, phase: t.phase, running: t.running };
-    const { hour12, ticker } = getState().settings.widgets;
+    const { hour12, ticker, ambient } = getState().settings.widgets;
     live.hour12 = hour12;
+    live.ambient = ambient;
     live.symbol = ticker[0] ?? null;
     send('island:to', { t: 'live', live });
   };
@@ -85,6 +87,16 @@ export function startIslandHost(): void {
     if (watching) sendLive();
   });
 
+  const sendImages = () =>
+    send('island:to', {
+      t: 'images',
+      images: library().map((i) => ({ id: i.id, name: i.name, px: Array.from(i.frames[0]!), frames: i.frames.length, builtin: i.builtin })),
+    });
+  // Something saved or deleted in the main window shows up in the island straight away.
+  onSaved(() => {
+    if (getState().settings.island) sendImages();
+  });
+
   subscribe(sync);
   onActivity(sync);
   player.onFrame((frame) => {
@@ -110,6 +122,14 @@ export function startIslandHost(): void {
       case 'watch':
         watch(message.on);
         break;
+      case 'images':
+        sendImages();
+        break;
+      case 'image': {
+        const item = library().find((i) => i.id === message.id);
+        if (item) showImage(item);
+        break;
+      }
       case 'timer':
         if (message.do === 'start') startPomodoro(25, 5);
         else if (message.do === 'toggle') toggleTimer();

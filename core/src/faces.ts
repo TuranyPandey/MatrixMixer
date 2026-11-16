@@ -39,7 +39,32 @@ export function progressFrame(percent: number): Frame {
 export function onAirFrame(word: string, tick: number): Frame {
   const frame = blankFrame();
   drawRing(frame, 1, tick % 2 === 0 ? 255 : 90);
-  drawCentered(frame, renderText(word.toUpperCase()), Math.floor((SIZE - 7) / 2));
+  // Three letters fit in the big font; anything longer (MUTED) goes in the small one, clear of the ring.
+  if (word.length <= 3) drawCentered(frame, renderText(word.toUpperCase()), Math.floor((SIZE - 7) / 2));
+  else drawCentered(frame, renderTiny(word.toUpperCase()), TEXT_Y);
+  return frame;
+}
+
+/**
+ * Time left as a disk that drains, like a kitchen timer's red wedge: full at
+ * `fraction` 1, a thin slice near 0, emptying clockwise from 12 o'clock. Read
+ * at a glance from across the room, with no number to work out.
+ */
+export function countdownFrame(fraction: number): Frame {
+  const frame = blankFrame();
+  const left = clamp(fraction, 0, 1);
+  const mid = (SIZE - 1) / 2;
+  for (let y = 0; y < SIZE; y++) {
+    for (let x = 0; x < SIZE; x++) {
+      if (!isLed(x, y)) continue;
+      const distance = Math.hypot(x - mid, y - mid);
+      let angle = Math.atan2(x - mid, -(y - mid)); // 0 at the top, growing clockwise
+      if (angle < 0) angle += Math.PI * 2;
+      // The time already gone is the part swept from 12 o'clock; what is left stays lit.
+      const lit = left > 0 && (distance < 0.5 || angle >= (1 - left) * Math.PI * 2);
+      setPixel(frame, x, y, lit ? (distance > 10.5 ? 255 : 170) : distance > 10.5 ? 18 : 0);
+    }
+  }
   return frame;
 }
 

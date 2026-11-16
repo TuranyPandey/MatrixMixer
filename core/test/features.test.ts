@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AMBIENT_STYLES,
+  DESIGNS,
   RING,
+  ambientAnimation,
+  ambientStill,
+  countdownFrame,
+  lifeStep,
+  seededRandom,
   SIZE,
   formatPrice,
   gameFrame,
@@ -172,5 +179,66 @@ describe('calendar', () => {
       ['SUMMARY:Second Tuesday', 'DTSTART:20261110T093000Z', 'RRULE:FREQ=MONTHLY;BYDAY=2TU'],
     ]);
     expect(upcomingEvents(ics, 0, FAR)).toEqual([]);
+  });
+});
+
+describe('meeting countdown', () => {
+  it('drains clockwise from the top and ends dark', () => {
+    const full = lit(countdownFrame(1));
+    expect(full).toBeGreaterThan(450);
+    expect(lit(countdownFrame(0.5))).toBeGreaterThan(full * 0.45);
+    expect(lit(countdownFrame(0.5))).toBeLessThan(full * 0.55);
+    expect(lit(countdownFrame(0))).toBe(0);
+    // Half gone: the right half (the first half of the time) is what has emptied.
+    const half = countdownFrame(0.5);
+    expect(getPixel(half, 18, 12)).toBeLessThan(100);
+    expect(getPixel(half, 6, 12)).toBeGreaterThan(100);
+  });
+});
+
+describe('ready-made designs', () => {
+  it.each(DESIGNS.map((d) => [d.name, d.frame] as const))('%s is drawn and sits inside the circle', (_name, frame) => {
+    expect(lit(frame)).toBeGreaterThan(60);
+    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (!isLed(x, y)) expect(getPixel(frame, x, y)).toBe(0);
+    // Whole 2x2 blocks only: nothing was clipped by the round edge.
+    expect(lit(frame) % 4).toBe(0);
+  });
+});
+
+describe('ambient animations', () => {
+  const blinker = () => {
+    const cells = new Uint8Array(SIZE * SIZE);
+    for (const x of [11, 12, 13]) cells[12 * SIZE + x] = 1;
+    return cells;
+  };
+
+  it('life follows the rules: a blinker flips and flips back', () => {
+    const once = lifeStep(blinker());
+    expect([11, 12, 13].map((y) => once[y * SIZE + 12])).toEqual([1, 1, 1]);
+    expect(once.reduce((n, v) => n + v, 0)).toBe(3);
+    expect(Array.from(lifeStep(once))).toEqual(Array.from(blinker()));
+  });
+
+  it('life never grows past the rim', () => {
+    const full = new Uint8Array(SIZE * SIZE).fill(1);
+    const next = lifeStep(full);
+    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (!isLed(x, y)) expect(next[y * SIZE + x]).toBe(0);
+  });
+
+  it.each(AMBIENT_STYLES.map((s) => s.id))('%s keeps moving, stays on real LEDs and never goes dark for long', (style) => {
+    const next = ambientAnimation(style, seededRandom(1));
+    const frames = Array.from({ length: 400 }, () => next());
+    for (const frame of frames) {
+      for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (!isLed(x, y)) expect(getPixel(frame, x, y)).toBe(0);
+    }
+    // After a short warm-up there is always something lit, including across a Life reseed.
+    const dark = frames.slice(20).filter((f) => f.every((v) => v === 0)).length;
+    expect(dark).toBeLessThan(4);
+    expect(new Set(frames.slice(20).map((f) => f.join())).size).toBeGreaterThan(40);
+  });
+
+  it('the still is the same every time', () => {
+    expect(ambientStill('rain')).toBe(ambientStill('rain'));
+    expect(lit(ambientStill('stars'))).toBeGreaterThan(3);
   });
 });

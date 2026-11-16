@@ -1,6 +1,6 @@
 {
   "name": "matrix-bridge-cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Push text, images and frames to a Phone (3) Glyph Matrix from any terminal.",
   "license": "MIT",
   "type": "module",

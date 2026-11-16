@@ -5,8 +5,15 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.os.BatteryManager
 import android.content.pm.ServiceInfo
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
@@ -42,6 +49,39 @@ class BridgeService : Service(), BridgeServer.Host {
 
     private val blankWhenIdle = Runnable { MatrixDriver.clear() }
 
+    /** This phone's battery as (level, charging). Reported to the PC. */
+    @Volatile
+    override var battery: Pair<Int, Boolean>? = null
+        private set
+
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) = readBattery(intent)
+    }
+
+    // Lying on its back, the matrix faces the table. Gravity along z says which way up the phone is.
+    private var onBackSince = 0L
+    private val tilt = object : SensorEventListener {
+        override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+
+        override fun onSensorChanged(event: SensorEvent) {
+            val z = event.values[2]
+            val now = SystemClock.uptimeMillis()
+            when {
+                // Flat, screen up: wait a moment so a wobble on the way down does not blink the matrix.
+                z > ON_BACK_Z -> {
+                    if (onBackSince == 0L) onBackSince = now
+                    if (now - onBackSince >= ON_BACK_MS) MatrixDriver.setHidden(true)
+                }
+                // Clearly picked up or turned over: come back at once.
+                z < OFF_BACK_Z -> {
+                    onBackSince = 0L
+                    MatrixDriver.setHidden(false)
+                }
+            }
+        }
+    }
+    private var tiltOn = false
+
     override val deviceName: String get() = Build.MODEL ?: "Phone"
     override val toyActive: Boolean get() = Bridge.status.value.toyActive
 
@@ -56,6 +96,10 @@ class BridgeService : Service(), BridgeServer.Host {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
         )
         MatrixDriver.acquire(this)
+        Prefs.setWantRunning(this, true)
+        // The system answers with the current battery state straight away, then on every change.
+        registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))?.let(::readBattery)
+        applySettings()
 
         Bridge.onButton = { action -> server?.sendButton(action) }
         Bridge.onToyChanged = { active ->
@@ -66,13 +110,18 @@ class BridgeService : Service(), BridgeServer.Host {
         val store = PairingStore(this)
         server = BridgeServer(Protocol.DEFAULT_PORT, store, this).also { it.start() }
         Bridge.update {
-            it.copy(running = true, port = Protocol.DEFAULT_PORT, addresses = localAddresses(), error = null)
+            it.copy(running = true, port = Protocol.DEFAULT_PORT, addresses = localAddresses(), error = null, glyph = GlyphStore.load(this)?.name)
         }
+        BridgeTileService.requestRefresh(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_STOP -> stopSelf()
+            ACTION_STOP -> {
+                Prefs.setWantRunning(this, false)
+                stopSelf()
+            }
+            ACTION_SETTINGS_CHANGED -> applySettings()
             ACTION_PAIRING_CHANGED -> server?.dropUnpaired()
         }
         return START_STICKY
@@ -82,6 +131,9 @@ class BridgeService : Service(), BridgeServer.Host {
         Bridge.onButton = null
         Bridge.onToyChanged = null
         main.removeCallbacksAndMessages(null)
+        runCatching { unregisterReceiver(batteryReceiver) }
+        watchTilt(false)
+        MatrixDriver.setHidden(false)
         unregisterNsd()
         val s = server
         server = null
@@ -90,7 +142,8 @@ class BridgeService : Service(), BridgeServer.Host {
         releaseLocks()
         MatrixDriver.clear()
         MatrixDriver.release()
-        Bridge.update { BridgeStatus(toyActive = it.toyActive) }
+        Bridge.update { BridgeStatus(toyActive = it.toyActive, glyph = it.glyph) }
+        BridgeTileService.requestRefresh(this)
         super.onDestroy()
     }
 
@@ -135,20 +188,72 @@ class BridgeService : Service(), BridgeServer.Host {
         MatrixDriver.clear()
     }
 
+    override fun onStore(name: String, frames: List<IntArray>, delayMs: Int) {
+        GlyphStore.save(this, SavedGlyph(name, frames, delayMs))
+        Bridge.update { it.copy(glyph = name) }
+    }
+
     override fun onClientsChanged(names: List<String>) {
         Bridge.update { it.copy(clients = names) }
         main.post {
             main.removeCallbacks(blankWhenIdle)
             if (names.isEmpty()) {
-                // Nobody connected: let go of the radios and, after a grace period, the LEDs.
+                // Nobody connected: let go of the radios, then do what the user chose for the matrix.
                 releaseLocks()
-                main.postDelayed(blankWhenIdle, IDLE_BLANK_MS)
+                rest()
             } else {
                 acquireLocks()
             }
             getSystemService(NotificationManager::class.java)
                 ?.notify(NOTIFICATION_ID, buildNotification(names.size))
         }
+    }
+
+    /** The last PC has gone. Go dark after a grace period, keep the last frame, or show the stored glyph. */
+    private fun rest() {
+        val glyph = GlyphStore.load(this)
+        when (Prefs.rest(this)) {
+            Prefs.Rest.LAST -> Unit
+            // Its first frame only: with no PC connected nothing keeps the phone awake to animate it.
+            Prefs.Rest.GLYPH -> if (glyph != null) MatrixDriver.show(glyph.frames[0]) else main.postDelayed(blankWhenIdle, IDLE_BLANK_MS)
+            Prefs.Rest.DARK -> main.postDelayed(blankWhenIdle, IDLE_BLANK_MS)
+        }
+    }
+
+    // ---- settings, battery, which way up ---------------------------------------------
+
+    /** Re-reads the choices made in the app. Called at start and whenever one changes. */
+    private fun applySettings() {
+        watchTilt(Prefs.hideOnBack(this))
+        if (Bridge.status.value.clients.isEmpty() && server != null) {
+            main.removeCallbacks(blankWhenIdle)
+            rest()
+        }
+    }
+
+    private fun watchTilt(on: Boolean) {
+        if (on == tiltOn) return
+        val sensors = getSystemService(SensorManager::class.java) ?: return
+        if (on) {
+            val gravity = sensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) ?: return
+            sensors.registerListener(tilt, gravity, SensorManager.SENSOR_DELAY_NORMAL)
+        } else {
+            sensors.unregisterListener(tilt)
+            onBackSince = 0L
+            MatrixDriver.setHidden(false)
+        }
+        tiltOn = on
+    }
+
+    private fun readBattery(intent: Intent) {
+        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+        if (level < 0 || scale <= 0) return
+        val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val now = (level * 100 / scale) to (status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL)
+        if (now == battery) return
+        battery = now
+        server?.sendBattery(now.first, now.second)
     }
 
     // ---- network discovery ------------------------------------------------------
@@ -257,13 +362,26 @@ class BridgeService : Service(), BridgeServer.Host {
         private const val MAX_WAKE_MS = 12 * 60 * 60 * 1000L
         const val ACTION_STOP = "io.github.matrixbridge.phone.STOP"
         const val ACTION_PAIRING_CHANGED = "io.github.matrixbridge.phone.PAIRING_CHANGED"
+        const val ACTION_SETTINGS_CHANGED = "io.github.matrixbridge.phone.SETTINGS_CHANGED"
+        /** Gravity along z (m/s2) above which the phone counts as lying on its back, and below which it does not. */
+        private const val ON_BACK_Z = 8.8f
+        private const val OFF_BACK_Z = 7.0f
+        private const val ON_BACK_MS = 1500L
 
         fun start(context: Context) {
             context.startForegroundService(Intent(context, BridgeService::class.java))
         }
 
+        /** Stops because the user asked: it stays stopped until they start it again. */
         fun stop(context: Context) {
+            Prefs.setWantRunning(context, false)
             context.stopService(Intent(context, BridgeService::class.java))
+        }
+
+        /** Tells a running service that a choice in the app changed. */
+        fun settingsChanged(context: Context) {
+            if (!Bridge.status.value.running) return
+            context.startService(Intent(context, BridgeService::class.java).setAction(ACTION_SETTINGS_CHANGED))
         }
 
         /** Tells a running service that a PC was removed from the paired list. */

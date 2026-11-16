@@ -1,6 +1,6 @@
 [package]
 name = "matrix-bridge"
-version = "0.2.0"
+version = "0.2.1"
 description = "Your Phone (3)'s Glyph Matrix, powered by your PC"
 edition = "2021"
 license = "MIT"

@@ -6,39 +6,65 @@ MatrixMixer turns the Glyph Matrix on the back of a Nothing phone into a status 
 
 Open source, community-built, and not affiliated with or endorsed by Nothing.
 
-![The PC app: type a message and it appears on the matrix preview, and on the phone](docs/images/text.png)
+![The PC app: the matrix on top with a clock on it, and a shelf of widgets underneath](docs/images/main.png)
 
-> **Status: early.** Tested on a real Phone (3) over USB, and against a simulated phone. Several newer features have only been tried on one PC. Expect rough edges and please [report them](../../issues).
+> **Status: early.** Tested on a real Phone (3) and against a simulated phone. Many features have only been tried on one PC, and some of the newest have not been seen on the phone's matrix yet. Expect rough edges and please [report them](../../issues).
 
 ## What it does
 
-**Show things on the matrix**
-- Scrolling text, a pixel editor, and images or GIFs shrunk to the round matrix
+**Put things on the matrix**
+- Text that scrolls past
 - Widgets: clock, Pomodoro and countdown, CPU/RAM meter, load graph, stocks and crypto ticker, weather
 - A music visualiser: a 12-band spectrum of whatever your PC is playing, with peak caps that hang on the hits
+- Ambient animations for when there is nothing to say: rain, a starfield, the Game of Life
 
 ![A spectrum of the music playing on the PC](docs/images/visualiser.png)
 
-**Let things reach the matrix on their own**
-- A progress ring for long jobs: `matrix progress 42 BUILD`, then DONE when it reaches 100
-- On air: the ring breathes while an app uses your microphone or camera
+**Images: draw them, bring them in, keep them**
+- A pixel editor for the round matrix, with up to 24 frames for animations
+- Any picture or GIF from a file, shrunk to 25 by 25
+- Everything you save by name lands in one library, next to a set of ready-made pictures
+- **Keep on phone** sends a drawing or animation to the phone, which can then show it with no PC at all
+
+![The Images tab: saved and ready-made pictures, with a heart on the matrix](docs/images/images.png)
+
+**Connectors: things that reach the matrix on their own**
+- On air: the ring breathes while an app uses your microphone or camera, and holds still reading MUTED when you mute
+- Calendar: a heads-up before each meeting, from a private .ics link, then a disk that drains until it starts
 - Now playing: the title and artist pass by when a new track starts
-- Calendar: a heads-up before each meeting, from a private .ics link
-- GitHub pushes and CI results, PC battery low or full, and anything your own scripts send
+- A reminder that passes every so often: STRETCH, WATER
+- GitHub pushes and CI results, and PC battery low or full
 - A game HUD for Counter-Strike 2: health on the ring, ammo on a bar
+- Your own scripts: `matrix notify "TESTS PASSED"`, or a progress ring with `matrix progress 42 BUILD`
 
 Notices pass once, then hand the matrix back to whatever was showing.
 
-![A build's progress filling the ring](docs/images/progress.png)
+![The Connectors tab: one small matrix per connector, the switched-on ones ringed in red](docs/images/connectors.png)
+
+![A job's progress filling the ring](docs/images/progress.png)
+
+**The Glyph Button as a PC key**
+
+Long-press the button on the back of the phone to mute your microphone, play or pause media, step through your widgets, lock the PC or run any command.
+
+![The Glyph Button tab: pick what a long-press does](docs/images/glyph-button.png)
 
 **The island**
 
-A small always-on-top pill on your PC desktop mirrors the matrix. Hover it for brightness, a quick message box, Clear, and a shelf of widgets with live readings. Put it in any of six spots, or switch it off.
+A small always-on-top pill on your PC desktop mirrors the matrix. Hover it for brightness, a quick message box, your widgets with live readings, and your saved pictures in a row you can scroll through. Put it in any of six spots, or switch it off.
 
-<img src="docs/images/island-open.png" width="400" alt="The island opened on hover: live matrix, status, brightness and a message box">
+<img src="docs/images/island-open.png" width="400" alt="The island opened on hover: the matrix, the link to the phone, brightness, and a row of saved pictures">
 
-**Use the phone as a PC button**
-- Long-press the Glyph Button to play/pause media, mute, lock the PC or run any command
+**The phone app**
+
+<img src="docs/images/phone.png" width="300" alt="The phone app: the MatrixMixer mark, a preview of the matrix, Start, and sections for My Glyph and the Glyph Button">
+
+Small on purpose: it draws what the PC sends and reports the Glyph Button. It can also:
+- Start by itself when the phone starts, or from a Quick Settings tile
+- Go dark while the phone lies on its back, where the matrix only lights the table
+- Keep the last picture, or show your kept glyph, when the PC goes away
+- Loop your kept glyph as its own Glyph Toy, **My Glyph**, with no PC around
+- Tell the PC its battery level
 
 **For developers**
 - A `matrix` command line tool and a local HTTP API, so any script can push to the matrix
@@ -60,7 +86,7 @@ npm test && matrix send "tests passed" || matrix send "TESTS FAILED"
  └──────────────────────────────┘ button events └─────────────────────────┘
 ```
 
-The PC renders everything into finished frames sized for the phone's matrix. The phone only draws them and reports button presses, which keeps the Android app small. No cloud and no account: PC and phone talk directly over your own network or USB. The only outside services are the optional weather, ticker and calendar features.
+The PC renders everything into finished frames sized for the phone's matrix. The phone only draws them and reports button presses, which keeps the Android app small. Even the glyph the phone keeps for itself is frames the PC drew. No cloud and no account: PC and phone talk directly over your own network or USB. The only outside services are the optional weather, ticker and calendar features.
 
 | Folder | What | Built with |
 |---|---|---|
@@ -75,9 +101,13 @@ The PC renders everything into finished frames sized for the phone's matrix. The
 Grab the Windows installer and the APK from [Releases](../../releases), or build from source with [docs/SETUP.md](docs/SETUP.md).
 
 1. Install the APK on the phone, open **MatrixMixer** and tap **Start**.
-2. Open MatrixMixer on the PC and press **Search this network**.
+2. Open MatrixMixer on the PC. It opens on Settings > Phone: press **Search this network**.
 3. Type the 6-digit code shown on the phone.
 4. Send something from the **Text** tab.
+
+Windows may warn that the installer is from an unknown publisher (it is not code-signed): choose **More info**, then **Run anyway**.
+
+**Updating.** The PC installer goes straight over the old version and keeps your settings. The phone app does too from 0.2.1 on. Coming from 0.2.0 or earlier, uninstall the phone app once first: those builds were signed with a different key, and Android answers "App not installed".
 
 Built for every Nothing phone with a Glyph Matrix:
 
@@ -94,6 +124,8 @@ Own a Glyph Matrix phone that is not on this list? [Open an issue](../../issues)
 
 Nothing OS only shares the Glyph Button with the Glyph Toy that is currently selected. Add the **PC Remote** toy in Settings > Glyph Interface > Glyph Toys, then short-press the Glyph Button until its two-headed arrow shows. From then on a long-press triggers the action you picked in the PC app's **Glyph Button** tab. A short press is never delivered to apps; it moves on to the next toy.
 
+The same list has a second toy, **My Glyph**, which loops the picture or animation you kept on the phone.
+
 ## Command line
 
 ```
@@ -106,7 +138,7 @@ matrix clear
 matrix sim                            run a fake phone in the terminal
 ```
 
-While the PC app is running, commands go through it. The HTTP API behind it is documented in the app's **Developer** tab.
+While the PC app is running, commands go through it. The HTTP API behind it is documented on the app's **Developer** page, which you switch on under Settings > Desktop.
 
 ## Security
 

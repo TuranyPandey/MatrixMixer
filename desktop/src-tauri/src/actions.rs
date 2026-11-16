@@ -9,8 +9,8 @@ pub fn run(kind: &str, arg: Option<String>) -> Result<(), String> {
         "next_track" => keys::tap(&[keys::MEDIA_NEXT]),
         "previous_track" => keys::tap(&[keys::MEDIA_PREVIOUS]),
         "mute_volume" => keys::tap(&[keys::VOLUME_MUTE]),
-        // Windows 11's system-wide microphone mute shortcut: Win + Alt + K.
-        "mute_mic" => keys::tap(&[keys::LEFT_WIN, keys::ALT, keys::K]),
+        // The app normally calls mic_toggle itself so it can show the new state; this is the same switch.
+        "mute_mic" => crate::mic::toggle().map(|_| ()),
         "lock" => lock(),
         "command" => {
             let command = arg.unwrap_or_default();
@@ -58,9 +58,6 @@ mod keys {
     pub const MEDIA_PREVIOUS: u8 = 0xB1;
     pub const MEDIA_PLAY_PAUSE: u8 = 0xB3;
     pub const VOLUME_MUTE: u8 = 0xAD;
-    pub const LEFT_WIN: u8 = 0x5B;
-    pub const ALT: u8 = 0x12;
-    pub const K: u8 = 0x4B;
 
     /// Presses the keys in order, then releases them in reverse, like a hand would.
     #[cfg(windows)]

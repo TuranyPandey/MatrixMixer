@@ -1,5 +1,6 @@
 package io.github.matrixbridge.phone
 
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 
@@ -15,6 +16,9 @@ object Protocol {
     const val SIZE = 25
     const val PIXELS = SIZE * SIZE
 
+    /** The most frames a stored glyph may have. */
+    const val MAX_STORED_FRAMES = 24
+
     /** A message from the PC, already validated. */
     sealed class PcMessage {
         data class Pair(val code: String, val name: String) : PcMessage()
@@ -23,6 +27,9 @@ object Protocol {
         data class Brightness(val value: Int) : PcMessage()
         data object Clear : PcMessage()
         data object Ping : PcMessage()
+
+        /** A picture or animation to keep on the phone. [delayMs] is per frame, 50..1000. */
+        class Store(val name: String, val frames: List<IntArray>, val delayMs: Int) : PcMessage()
     }
 
     private val CODE = Regex("^\\d{6}$")
@@ -48,21 +55,16 @@ object Protocol {
             }
 
             "frame" -> {
-                val array = json.optJSONArray("px") ?: return null
-                if (array.length() != PIXELS) return null
-                val px = IntArray(PIXELS)
-                for (i in 0 until PIXELS) {
-                    val raw = array.opt(i)
-                    // Whole numbers only: 1.5 or "12" are rejected rather than rounded.
-                    val v = when (raw) {
-                        is Int -> raw
-                        is Long -> if (raw in 0..255) raw.toInt() else return null
-                        else -> return null
-                    }
-                    if (v !in 0..255) return null
-                    px[i] = v
-                }
-                PcMessage.Frame(px)
+                PcMessage.Frame(pixels(json.optJSONArray("px")) ?: return null)
+            }
+
+            "store" -> {
+                val list = json.optJSONArray("frames") ?: return null
+                if (list.length() !in 1..MAX_STORED_FRAMES) return null
+                val frames = (0 until list.length()).map { pixels(list.optJSONArray(it)) ?: return null }
+                val delay = json.opt("delay") as? Int ?: return null
+                if (delay !in 50..1000) return null
+                PcMessage.Store((json.opt("name") as? String ?: "Glyph").take(40), frames, delay)
             }
 
             "brightness" -> {
@@ -77,6 +79,23 @@ object Protocol {
         }
     }
 
+    /** One frame: exactly 625 whole numbers, 0..255. Null for anything else. */
+    private fun pixels(array: JSONArray?): IntArray? {
+        if (array == null || array.length() != PIXELS) return null
+        val px = IntArray(PIXELS)
+        for (i in 0 until PIXELS) {
+            // Whole numbers only: 1.5 or "12" are rejected rather than rounded.
+            val v = when (val raw = array.opt(i)) {
+                is Int -> raw
+                is Long -> if (raw in 0..255) raw.toInt() else return null
+                else -> return null
+            }
+            if (v !in 0..255) return null
+            px[i] = v
+        }
+        return px
+    }
+
     fun hello(deviceName: String): String = JSONObject()
         .put("t", "hello").put("v", VERSION).put("device", "phone3")
         .put("name", deviceName).put("size", SIZE).toString()
@@ -86,6 +105,12 @@ object Protocol {
     fun ready(): String = """{"t":"ready"}"""
 
     fun pong(): String = """{"t":"pong"}"""
+
+    fun stored(name: String): String = JSONObject().put("t", "stored").put("name", name).toString()
+
+    /** [level] is 0..100. */
+    fun battery(level: Int, charging: Boolean): String = JSONObject()
+        .put("t", "battery").put("level", level.coerceIn(0, 100)).put("charging", charging).toString()
 
     fun status(toyActive: Boolean): String = JSONObject().put("t", "status").put("toy", toyActive).toString()
 

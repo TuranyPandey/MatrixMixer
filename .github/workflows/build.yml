@@ -36,9 +36,27 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Download Nothing's Glyph Matrix SDK
         run: ./scripts/fetch-sdk.sh
+      # The release key lives in the repository's secrets. Pull requests from forks do not
+      # get secrets; those builds fall back to the debug key and are never published.
+      - name: Fetch the release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          fi
       - name: Unit tests and APK
         working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew --no-daemon testDebugUnitTest assembleRelease
+      - name: A release must be signed with the release key
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          test -n "$ANDROID_KEYSTORE_FILE" || { echo "No signing key: set the ANDROID_KEYSTORE_* secrets"; exit 1; }
       - name: Name the APK after the product and version
         run: |
           v=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' android/app/build.gradle.kts)
@@ -104,7 +122,7 @@ jobs:
             2. On the PC, run the installer. Windows may show "Windows protected your PC" because the installer is not code-signed: choose **More info**, then **Run anyway**.
             3. In the PC app, press **Search this network** and type the 6-digit code shown on the phone.
 
-            Updating the phone app from an earlier release: uninstall the old one first. Release builds are not signed with a stable key yet, so Android refuses to install one over another.
+            Updating the phone app: from 0.2.1 on, a new APK installs straight over the old one. Coming from 0.2.0 or earlier, uninstall the old app once first; those were signed with a different key, so Android reports "App not installed".
 
             Full setup, including USB for networks that block device discovery: [docs/SETUP.md](https://github.com/${{ github.repository }}/blob/main/docs/SETUP.md)
 

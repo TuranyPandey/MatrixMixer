@@ -23,6 +23,10 @@ class BridgeServer(
         fun onFrame(px: IntArray)
         fun onBrightness(value: Int)
         fun onClear()
+        /** A glyph to keep. Called before the PC is told it was stored. */
+        fun onStore(name: String, frames: List<IntArray>, delayMs: Int)
+        /** This phone's battery as (level 0..100, charging), or null if not known yet. */
+        val battery: Pair<Int, Boolean>?
         /** Names of connected, paired PCs. Called whenever the list changes. */
         fun onClientsChanged(names: List<String>)
         fun onCodeChanged(code: String)
@@ -100,6 +104,10 @@ class BridgeServer(
                     is Protocol.PcMessage.Frame -> host.onFrame(msg.px)
                     is Protocol.PcMessage.Brightness -> host.onBrightness(msg.value)
                     is Protocol.PcMessage.Clear -> host.onClear()
+                    is Protocol.PcMessage.Store -> {
+                        host.onStore(msg.name, msg.frames, msg.delayMs)
+                        conn.send(Protocol.stored(msg.name))
+                    }
                     else -> Unit
                 }
             }
@@ -144,6 +152,7 @@ class BridgeServer(
         session.authed = true
         conn.send(Protocol.ready())
         conn.send(Protocol.status(host.toyActive))
+        host.battery?.let { (level, charging) -> conn.send(Protocol.battery(level, charging)) }
         publishClients()
     }
 
@@ -162,6 +171,11 @@ class BridgeServer(
 
     fun sendToyStatus(active: Boolean) {
         val text = Protocol.status(active)
+        authedConnections().forEach { it.send(text) }
+    }
+
+    fun sendBattery(level: Int, charging: Boolean) {
+        val text = Protocol.battery(level, charging)
         authedConnections().forEach { it.send(text) }
     }
 

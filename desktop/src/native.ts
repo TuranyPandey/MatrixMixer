@@ -116,8 +116,17 @@ export async function audioBands(): Promise<number[]> {
 }
 
 /** Whether the microphone or camera is in use right now. */
-export async function onAir(): Promise<{ mic: boolean; camera: boolean }> {
-  return isTauri ? invoke('on_air') : { mic: false, camera: false };
+export async function onAir(): Promise<{ mic: boolean; camera: boolean; muted: boolean }> {
+  return isTauri ? invoke('on_air') : { mic: false, camera: false, muted: browserMuted };
+}
+
+let browserMuted = false;
+
+/** Flips the system microphone's mute switch. Resolves true if it is now muted. */
+export async function micToggle(): Promise<boolean> {
+  if (isTauri) return invoke<boolean>('mic_toggle');
+  console.info('[browser] would flip the microphone mute switch');
+  return (browserMuted = !browserMuted);
 }
 
 /** Downloads an https link as text. The desktop app can reach servers a web page is not allowed to. */

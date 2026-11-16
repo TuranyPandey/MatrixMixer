@@ -5,6 +5,7 @@
  */
 import {
   alarmFrame,
+  ambientStill,
   clockFrame,
   graphFrame,
   meterFrame,
@@ -13,11 +14,12 @@ import {
   staticTextFrame,
   timerFrame,
   weatherFrame,
+  type AmbientStyle,
   type Frame,
   type WeatherKind,
 } from '@matrix-bridge/core';
 
-export type ShelfId = 'clock' | 'timer' | 'system meter' | 'load graph' | 'visualiser' | 'ticker' | 'weather';
+export type ShelfId = 'clock' | 'timer' | 'system meter' | 'load graph' | 'visualiser' | 'ticker' | 'weather' | 'ambient';
 
 export const SHELF: Array<{ id: ShelfId; name: string; about: string }> = [
   { id: 'clock', name: 'Clock', about: 'The time, big enough to read from across the desk.' },
@@ -27,6 +29,7 @@ export const SHELF: Array<{ id: ShelfId; name: string; about: string }> = [
   { id: 'visualiser', name: 'Visualiser', about: 'A spectrum of whatever this PC is playing: bass on the left, treble on the right, with caps that hang on the hits.' },
   { id: 'ticker', name: 'Ticker', about: "Prices scroll past with today's change, refreshed every minute." },
   { id: 'weather', name: 'Weather', about: 'A small picture of the sky with the temperature under it, refreshed every 15 minutes.' },
+  { id: 'ambient', name: 'Ambient', about: 'Nothing to read, just something alive on the back of the phone.' },
 ];
 
 /** A spectrum that looks like music. The real one only runs while the visualiser is shown. */
@@ -43,6 +46,7 @@ export type PreviewInput = {
   /** First ticker symbol, e.g. "BTC-USD". */
   symbol: string | null;
   weather: { temperature: number; kind: string } | null;
+  ambient: AmbientStyle;
 };
 
 export function previewFrames(p: PreviewInput): Record<ShelfId, Frame> {
@@ -58,5 +62,6 @@ export function previewFrames(p: PreviewInput): Record<ShelfId, Frame> {
     visualiser: spectrumFrame(SAMPLE_BANDS, SAMPLE_BANDS),
     ticker: staticTextFrame(renderText((p.symbol ?? 'BTC').replace(/-USD$|\..*$/, '').slice(0, 4))),
     weather: p.weather ? weatherFrame(p.weather.temperature, p.weather.kind as WeatherKind) : weatherFrame(21, 'clear'),
+    ambient: ambientStill(p.ambient),
   };
 }

@@ -18,6 +18,7 @@ import {
   disconnect,
   forgetPhone,
   pair,
+  keepOnPhone,
   player,
   runBinding,
   sendText,
@@ -26,6 +27,7 @@ import {
   type ActionKind,
 } from './bridge';
 import { DotText } from './DotText';
+import { MAX_FRAMES, fitFrames, onEdit, saveImage, type SavedImage } from './library';
 import { MatrixView } from './MatrixView';
 import { apiInfo, discoverPhones, isTauri, type ApiInfo, type FoundPhone } from './native';
 import { ROTATABLE } from './widgets';
@@ -283,17 +285,7 @@ export function TextPanel(_: PanelProps) {
 
 // ---- Draw -------------------------------------------------------------------------
 
-type SavedDrawing = { name: string; px: number[] };
-const DRAWINGS_KEY = 'matrix-bridge.drawings';
-
-function loadDrawings(): SavedDrawing[] {
-  try {
-    const list = JSON.parse(localStorage.getItem(DRAWINGS_KEY) ?? '[]') as SavedDrawing[];
-    return Array.isArray(list) ? list.filter((d) => Array.isArray(d.px) && d.px.length === PIXELS) : [];
-  } catch {
-    return [];
-  }
-}
+const isBlank = (frame: Frame) => frame.every((v) => v === 0);
 
 const BRUSHES = [
   { label: 'Bright', value: 255 },
@@ -302,32 +294,68 @@ const BRUSHES = [
 ];
 
 export function DrawPanel(_: PanelProps) {
-  const [frame, setFrame] = useState<Frame>(() => blankFrame());
+  // A drawing is one frame; add more and it is an animation.
+  const [frames, setFrames] = useState<Frame[]>(() => [blankFrame()]);
+  const [at, setAt] = useState(0);
+  const [delay, setDelay] = useState(200);
+  const [playing, setPlaying] = useState(false);
+  /** What came of the last "Keep on phone". */
+  const [kept, setKept] = useState<{ ok: boolean; text: string } | null>(null);
+  const frame = frames[at] ?? frames[0]!;
   const [brush, setBrush] = useState(255);
   const [live, setLive] = useState(true);
   const [name, setName] = useState('');
-  const [drawings, setDrawings] = useState(loadDrawings);
   const [copied, setCopied] = useState(false);
+  const [savedAs, setSavedAs] = useState<string | null>(null);
 
   const apply = (next: Frame) => {
-    setFrame(next);
+    // Drawing on a moving picture makes no sense: editing stops the playback.
+    setPlaying(false);
+    setFrames((list) => list.map((f, i) => (i === at ? next : f)));
     if (live) player.show(next, 'drawing');
   };
+  const goTo = (index: number, list = frames) => {
+    setPlaying(false);
+    setAt(index);
+    if (live) player.show(list[index]!, 'drawing');
+  };
+  const addFrame = () => {
+    // A copy of the frame you are on, so the next step of the movement is a small change.
+    const list = [...frames.slice(0, at + 1), frame.slice(), ...frames.slice(at + 1)];
+    setFrames(list);
+    goTo(at + 1, list);
+  };
+  const removeFrame = () => {
+    const list = frames.filter((_, i) => i !== at);
+    setFrames(list);
+    goTo(Math.max(0, at - 1), list);
+  };
+  const open = (d: SavedImage) => {
+    const list = (d.frames?.length ? d.frames : [d.px]).slice(0, MAX_FRAMES).map((px) => Uint8Array.from(px));
+    setFrames(list);
+    setDelay(Math.max(50, Math.min(1000, d.delay ?? 200)));
+    goTo(0, list);
+  };
+
+  // Playing loops the frames here and on the matrix, in step.
+  useEffect(() => {
+    if (!playing) return;
+    void player.play(animationSource(frames, delay, true, 'drawing'));
+    const id = window.setInterval(() => setAt((i) => (i + 1) % frames.length), delay);
+    return () => window.clearInterval(id);
+  }, [playing, delay, frames]);
   const paint = (x: number, y: number) => {
     if (frame[y * SIZE + x] === brush) return;
     const next = frame.slice();
     next[y * SIZE + x] = brush;
     apply(next);
   };
-  const persist = (list: SavedDrawing[]) => {
-    setDrawings(list);
-    try {
-      localStorage.setItem(DRAWINGS_KEY, JSON.stringify(list));
-    } catch {
-      /* not saved; still usable this session */
-    }
-  };
-  const empty = frame.every((v) => v === 0);
+  // "Edit" on the Saved view sends the picture here.
+  const openRef = useRef(open);
+  openRef.current = open;
+  useEffect(() => onEdit((image) => openRef.current(image)), []);
+  const empty = isBlank(frame);
+  const allEmpty = frames.every(isBlank);
 
   return (
     <>
@@ -382,40 +410,82 @@ export function DrawPanel(_: PanelProps) {
               onSubmit={(ev) => {
                 ev.preventDefault();
                 const clean = name.trim();
-                if (!clean || empty) return;
-                persist([{ name: clean, px: Array.from(frame) }, ...drawings.filter((d) => d.name !== clean)]);
+                if (!clean || allEmpty) return;
+                const saved: SavedImage = { name: clean, px: Array.from(frames[0]!) };
+                if (frames.length > 1) Object.assign(saved, { frames: frames.map((f) => Array.from(f)), delay });
+                saveImage(saved);
+                setSavedAs(clean);
                 setName('');
               }}
             >
               <span className="label">Keep it</span>
               <div className="row">
                 <input aria-label="Name for this drawing" value={name} onChange={(ev) => setName(ev.target.value)} maxLength={40} placeholder="Name it" />
-                <button type="submit" className="ghost" disabled={!name.trim() || empty}>
+                <button type="submit" className="ghost" disabled={!name.trim() || allEmpty}>
                   Save
                 </button>
               </div>
+              {savedAs && <span className="hint">Saved as "{savedAs}". It is under Saved, and in the island.</span>}
             </form>
           </div>
         </div>
-      </Section>
-      <Section title="Saved drawings">
-        {drawings.length === 0 ? (
-          <p className="muted">Nothing saved yet. Draw something, name it and save it.</p>
-        ) : (
-          <div className="gallery">
-            {drawings.map((d) => (
-              <div key={d.name} className="thumb">
-                <button className="thumb-open" onClick={() => apply(Uint8Array.from(d.px))} title={`Open ${d.name}`}>
-                  <MatrixView frame={Uint8Array.from(d.px)} size={84} label={d.name} />
-                  <span>{d.name}</span>
-                </button>
-                <button className="link danger" onClick={() => persist(drawings.filter((x) => x.name !== d.name))}>
-                  Delete
-                </button>
-              </div>
+        <div className="frames">
+          <span className="label">Frames</span>
+          <div className="frame-strip">
+            {frames.map((f, i) => (
+              <button key={i} className={i === at ? 'frame on' : 'frame'} aria-label={`Frame ${i + 1}`} aria-pressed={i === at} onClick={() => goTo(i)}>
+                <MatrixView frame={f} size={44} label={`Frame ${i + 1}`} />
+              </button>
             ))}
+            <button className="ghost" disabled={frames.length >= MAX_FRAMES} onClick={addFrame}>
+              Add frame
+            </button>
+            {frames.length > 1 && (
+              <button className="ghost" onClick={removeFrame}>
+                Delete frame
+              </button>
+            )}
           </div>
-        )}
+          {frames.length > 1 && (
+            <div className="row end">
+              <label className="field frame-time">
+                <span className="label">Each frame: {delay} ms</span>
+                <input type="range" min={50} max={1000} step={50} value={delay} onChange={(ev) => setDelay(Number(ev.target.value))} />
+              </label>
+              <button
+                onClick={() => {
+                  if (playing) goTo(at);
+                  else setPlaying(true);
+                }}
+              >
+                {playing ? 'Stop' : 'Play on matrix'}
+              </button>
+            </div>
+          )}
+          <div className="row keep-phone">
+            <button
+              className="ghost"
+              disabled={allEmpty}
+              title="The phone keeps it and can show it with no PC: its My Glyph toy, or while the PC is away"
+              onClick={() => {
+                const label = name.trim() || 'My glyph';
+                setKept({ ok: true, text: 'Sending' });
+                keepOnPhone(label, frames, delay).then(
+                  () => setKept({ ok: true, text: `On the phone as "${label}". Add the My Glyph toy there to show it without the PC.` }),
+                  (err) => setKept({ ok: false, text: err instanceof Error ? err.message : String(err) }),
+                );
+              }}
+            >
+              Keep on phone
+            </button>
+            {kept && <span className={kept.ok ? 'muted' : 'warn'}>{kept.text}</span>}
+          </div>
+          <p className="hint">
+            {frames.length === 1
+              ? 'Add a frame to turn the drawing into an animation. Each new frame starts as a copy of the one you are on.'
+              : `${frames.length} frames, ${((frames.length * delay) / 1000).toFixed(1)} seconds a loop. Save keeps the whole animation.`}
+          </p>
+        </div>
       </Section>
     </>
   );
@@ -472,6 +542,8 @@ export function ImagePanel(_: PanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
+  const [saveName, setSaveName] = useState('');
+  const [savedAs, setSavedAs] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
   const frames = useMemo(
@@ -500,6 +572,9 @@ export function ImagePanel(_: PanelProps) {
     setError(null);
     try {
       setDecoded(await decodeFile(file));
+      // The file's own name is a fair first guess at what to call it.
+      setSaveName(file.name.replace(/\.[^.]+$/, '').slice(0, 40));
+      setSavedAs(null);
     } catch {
       setDecoded(null);
       setError(`Could not open ${file.name}. Use a PNG, JPEG, GIF or WebP image.`);
@@ -579,6 +654,30 @@ export function ImagePanel(_: PanelProps) {
                 On/off dots only (dithered)
               </label>
               <button onClick={send}>{animated ? 'Play on matrix' : 'Send to matrix'}</button>
+              <form
+                className="save"
+                onSubmit={(ev) => {
+                  ev.preventDefault();
+                  const clean = saveName.trim();
+                  if (!clean || frames.length === 0) return;
+                  // Saved as it looks now, with the fit and contrast chosen above.
+                  const fitted = fitFrames(frames, decoded.delays);
+                  const image: SavedImage = { name: clean, px: Array.from(fitted.frames[0]!) };
+                  if (fitted.frames.length > 1) Object.assign(image, { frames: fitted.frames.map((f) => Array.from(f)), delay: fitted.delay });
+                  saveImage(image);
+                  setSavedAs(clean);
+                }}
+              >
+                <span className="label">Keep it</span>
+                <div className="row">
+                  <input aria-label="Name for this picture" value={saveName} onChange={(ev) => setSaveName(ev.target.value)} maxLength={40} placeholder="Name it" />
+                  <button type="submit" className="ghost" disabled={!saveName.trim()}>
+                    Save
+                  </button>
+                </div>
+                {savedAs && <span className="hint">Saved as "{savedAs}". It is under Saved, and in the island.</span>}
+                {animated && frames.length > MAX_FRAMES && <span className="hint">Long animations are saved as {MAX_FRAMES} frames.</span>}
+              </form>
             </div>
           </div>
         )}
@@ -592,11 +691,11 @@ export function ImagePanel(_: PanelProps) {
 const ACTIONS: Array<{ kind: ActionKind; label: string }> = [
   { kind: 'none', label: 'Do nothing' },
   { kind: 'next_widget', label: 'Next widget' },
-  { kind: 'play_pause', label: 'Play / pause media' },
+  { kind: 'play_pause', label: 'Play / pause' },
   { kind: 'next_track', label: 'Next track' },
   { kind: 'previous_track', label: 'Previous track' },
   { kind: 'mute_volume', label: 'Mute sound' },
-  { kind: 'mute_mic', label: 'Mute microphone (Win+Alt+K)' },
+  { kind: 'mute_mic', label: 'Mute microphone' },
   { kind: 'lock', label: 'Lock this PC' },
   { kind: 'command', label: 'Run a command' },
 ];
@@ -610,37 +709,114 @@ const GESTURES: Array<{ action: ButtonAction; label: string; hint: string }> = [
 export function ButtonsPanel(_: PanelProps) {
   const bridge = useBridge();
   const [testResult, setTestResult] = useState<string | null>(null);
-  const { buttons } = bridge.settings;
-  const { widgets } = bridge.settings;
+  const { buttons, widgets } = bridge.settings;
   const usesNext = Object.values(buttons).some((b) => b.kind === 'next_widget');
   const setBinding = (action: ButtonAction, patch: Partial<{ kind: ActionKind; command: string }>) =>
     updateSettings({ buttons: { ...buttons, [action]: { ...buttons[action], ...patch } } });
+  const test = (label: string, binding: (typeof buttons)[ButtonAction]) => {
+    setTestResult(null);
+    runBinding(binding).then(
+      (result) => setTestResult(`${label}: ${result === 'Done' ? 'ran' : result}`),
+      (err) => setTestResult(`${label}: ${err instanceof Error ? err.message : String(err)}`),
+    );
+  };
+  const long = buttons.long;
+  const live = bridge.connection === 'connected' && bridge.toyActive;
 
   return (
     <>
       <PageTitle title="Glyph Button" lede="One button on the back of the phone. Your PC on the other end." />
-      <Section title="How it works">
-        <p>
-          Nothing OS only shares the Glyph Button with the Glyph Toy that is currently selected. So: on the phone, add the
-          "PC Remote" toy, then short-press the Glyph Button until its arrow icon appears. From then on the gestures below
-          reach this PC. A short press is never sent; it moves to the next toy.
-        </p>
-        <p className={bridge.toyActive ? 'ok' : 'muted'}>
+      <section className="card">
+        <div className="card-head">
+          <h2>Long-press</h2>
+          <button className="ghost" disabled={long.kind === 'none'} onClick={() => test('Long-press', long)}>
+            Try it now
+          </button>
+        </div>
+        <p className="gb-status">
+          <span className={live ? 'dot connected' : 'dot'} aria-hidden="true" />
           {bridge.connection !== 'connected'
-            ? 'Phone not connected.'
-            : bridge.toyActive
-              ? 'PC Remote is selected. The button is live.'
-              : 'PC Remote is not the selected toy right now.'}
+            ? 'No phone linked, so the button cannot reach this PC yet.'
+            : live
+              ? 'The button is live: PC Remote is the selected toy.'
+              : 'Not live. On the phone, short-press the Glyph Button until the two-headed arrow shows.'}
         </p>
+        <p>Hold the Glyph Button and this PC will:</p>
+        <div className="action-grid" role="radiogroup" aria-label="What a long-press does">
+          {ACTIONS.map((a) => (
+            <button
+              key={a.kind}
+              role="radio"
+              aria-checked={long.kind === a.kind}
+              className={long.kind === a.kind ? 'chip on' : 'chip'}
+              onClick={() => setBinding('long', { kind: a.kind })}
+            >
+              {a.label}
+            </button>
+          ))}
+        </div>
+        {long.kind === 'command' && (
+          <>
+            <input
+              className="mono gb-command"
+              aria-label="Command for a long-press"
+              placeholder="e.g. notepad.exe  or  python C:\scripts\deploy.py"
+              value={long.command}
+              spellCheck={false}
+              onChange={(ev) => setBinding('long', { command: ev.target.value })}
+            />
+            <p className="hint">It runs on this PC with your user account, exactly as typed. Only add one you would run yourself.</p>
+          </>
+        )}
+        {usesNext && (
+          <div className="gb-rotation">
+            <span className="label">Next widget steps through</span>
+            <div className="row wrap">
+              {ROTATABLE.map((w) => {
+                const on = widgets.rotation.includes(w.name);
+                return (
+                  <button
+                    key={w.name}
+                    className={on ? 'chip on' : 'chip'}
+                    aria-pressed={on}
+                    onClick={() =>
+                      updateSettings({
+                        widgets: { ...widgets, rotation: on ? widgets.rotation.filter((n) => n !== w.name) : [...widgets.rotation, w.name] },
+                      })
+                    }
+                  >
+                    {w.label}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="hint">In this order. Ticker and Weather are skipped until they are set up in Widgets.</p>
+          </div>
+        )}
+        {testResult && <p className="mono muted">{testResult}</p>}
         {bridge.lastButton && (
           <p className="mono muted">
-            Last: {bridge.lastButton.action} at {new Date(bridge.lastButton.at).toLocaleTimeString()} · {bridge.lastButton.result}
+            Last press: {bridge.lastButton.action} at {new Date(bridge.lastButton.at).toLocaleTimeString()} · {bridge.lastButton.result}
           </p>
         )}
-      </Section>
+      </section>
 
-      <Section title="Actions">
-        {GESTURES.map(({ action, label, hint }) => {
+      <details className="more">
+        <summary>Set up the phone</summary>
+        <p>
+          Nothing OS only shares the Glyph Button with the Glyph Toy that is currently selected. On the phone, add the "PC Remote" toy
+          (Settings, Glyph Interface, Glyph Toys), then short-press the Glyph Button until its two-headed arrow appears. From then on a
+          long-press reaches this PC. A short press is never sent; it moves on to the next toy.
+        </p>
+      </details>
+
+      <details className="more">
+        <summary>Other gestures</summary>
+        <p className="hint">
+          These fire on every press, including the short presses that switch toys, so they go off by accident. Leave them on "Do nothing"
+          unless you have a use for them.
+        </p>
+        {GESTURES.filter((g) => g.action !== 'long').map(({ action, label, hint }) => {
           const binding = buttons[action];
           return (
             <div key={action} className="binding">
@@ -648,11 +824,7 @@ export function ButtonsPanel(_: PanelProps) {
                 <div>{label}</div>
                 <div className="hint">{hint}</div>
               </div>
-              <select
-                aria-label={`Action for ${label}`}
-                value={binding.kind}
-                onChange={(ev) => setBinding(action, { kind: ev.target.value as ActionKind })}
-              >
+              <select aria-label={`Action for ${label}`} value={binding.kind} onChange={(ev) => setBinding(action, { kind: ev.target.value as ActionKind })}>
                 {ACTIONS.map((a) => (
                   <option key={a.kind} value={a.kind}>
                     {a.label}
@@ -663,64 +835,19 @@ export function ButtonsPanel(_: PanelProps) {
                 <input
                   className="command mono"
                   aria-label={`Command for ${label}`}
-                  placeholder='e.g. notepad.exe  or  python C:\scripts\deploy.py'
+                  placeholder="e.g. notepad.exe"
                   value={binding.command}
                   spellCheck={false}
                   onChange={(ev) => setBinding(action, { command: ev.target.value })}
                 />
               )}
-              <button
-                className="ghost"
-                disabled={binding.kind === 'none'}
-                onClick={() => {
-                  setTestResult(null);
-                  runBinding(binding).then(
-                    (result) => setTestResult(`${label}: ${result === 'Done' ? 'ran' : result}`),
-                    (err) => setTestResult(`${label}: ${err instanceof Error ? err.message : String(err)}`),
-                  );
-                }}
-              >
+              <button className="ghost" disabled={binding.kind === 'none'} onClick={() => test(label, binding)}>
                 Test
               </button>
             </div>
           );
         })}
-        {testResult && <p className="mono muted">{testResult}</p>}
-        <p className="hint">
-          Commands run on this PC with your user account, exactly as typed. Only add ones you would run yourself.
-        </p>
-      </Section>
-
-      <Section title="Next widget">
-        <p>
-          Bind a gesture to "Next widget" and each press steps the matrix to the next one of these, so you can flip
-          through them from the back of the phone without touching the PC.
-        </p>
-        <div className="row wrap">
-          {ROTATABLE.map((w) => {
-            const on = widgets.rotation.includes(w.name);
-            return (
-              <button
-                key={w.name}
-                className={on ? 'chip on' : 'chip'}
-                aria-pressed={on}
-                onClick={() =>
-                  updateSettings({
-                    widgets: { ...widgets, rotation: on ? widgets.rotation.filter((n) => n !== w.name) : [...widgets.rotation, w.name] },
-                  })
-                }
-              >
-                {w.label}
-              </button>
-            );
-          })}
-        </div>
-        <p className="hint">
-          {usesNext
-            ? 'They come round in the order shown here. Ticker and Weather are skipped until they are set up in Widgets.'
-            : 'No gesture is set to "Next widget" yet. Long-press is the one to use.'}
-        </p>
-      </Section>
+      </details>
     </>
   );
 }

@@ -1,7 +1,7 @@
 {
   "name": "matrix-bridge",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Your Phone (3)'s Glyph Matrix, powered by your PC. Community project, not affiliated with Nothing.",
   "license": "MIT",
   "type": "module",

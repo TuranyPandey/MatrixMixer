@@ -4,7 +4,9 @@
  */
 import { useSyncExternalStore } from 'react';
 import {
+  AMBIENT_STYLES,
   alarmFrame,
+  ambientAnimation,
   clockFrame,
   graphFrame,
   liveSource,
@@ -25,7 +27,7 @@ import { clearMatrix, getSettings, noticeSpeed, player, registerAction, textSpee
 import { audioBands, desktopNotify, fetchText, systemStats } from './native';
 
 /** The widgets that are simply on or off, by the name after "widget: " in the player's label. */
-export type WidgetName = 'clock' | 'system meter' | 'load graph' | 'visualiser' | 'ticker' | 'weather';
+export type WidgetName = 'clock' | 'system meter' | 'load graph' | 'visualiser' | 'ticker' | 'weather' | 'ambient';
 
 /**
  * Starts a widget, or takes it off the matrix if it is the one showing.
@@ -53,6 +55,9 @@ export async function toggleWidget(name: WidgetName, options: { hour12?: boolean
       return startTicker();
     case 'weather':
       return startWeather();
+    case 'ambient':
+      startAmbient();
+      return null;
   }
 }
 
@@ -64,6 +69,7 @@ export const ROTATABLE: Array<{ name: WidgetName; label: string }> = [
   { name: 'visualiser', label: 'Visualiser' },
   { name: 'ticker', label: 'Ticker' },
   { name: 'weather', label: 'Weather' },
+  { name: 'ambient', label: 'Ambient' },
 ];
 
 /**
@@ -136,6 +142,13 @@ export function startVisualiser(): void {
       return spectrumFrame(levels, peaks);
     }),
   );
+}
+
+/** Something alive to look at, in the style chosen in Widgets: rain, a starfield or the Game of Life. */
+export function startAmbient(): void {
+  const style = AMBIENT_STYLES.find((s) => s.id === getSettings().widgets.ambient) ?? AMBIENT_STYLES[0]!;
+  const next = ambientAnimation(style.id);
+  void player.play(liveSource('widget: ambient', style.intervalMs, next));
 }
 
 // ---- ticker -------------------------------------------------------------------------

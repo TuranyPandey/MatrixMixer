@@ -1,13 +1,15 @@
 /**
  * The main window. One "stage": the matrix big at the top, what it is showing
- * and its brightness under it, then the modes that put things on it. Everything
- * about setting up (phone, connectors, button, desktop) lives on one Settings page.
+ * and its brightness under it, then everything that puts things on it or reacts to
+ * it: the modes, the connectors and the Glyph Button. Settings holds only what is
+ * set once: the phone, how the app sits on the desktop, and the opt-in Developer page.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { ConnectionState, Frame } from '@matrix-bridge/core';
 import { clearError, clearMatrix, player, setBrightness, updateSettings, useBridge } from './bridge';
 import { ConnectorsPanel } from './ConnectorsPanel';
+import { ImagesPanel } from './ImagesPanel';
 import { CursorDots } from './CursorDots';
 import { DotText } from './DotText';
 import { MatrixView } from './MatrixView';
@@ -16,8 +18,6 @@ import {
   ButtonsPanel,
   ConnectPanel,
   DeveloperPanel,
-  DrawPanel,
-  ImagePanel,
   PageTitle,
   ShowTitles,
   TextPanel,
@@ -27,15 +27,14 @@ import { describeShowing } from './showing';
 
 const MODES = [
   { id: 'text', label: 'Text', Panel: TextPanel },
-  { id: 'draw', label: 'Draw', Panel: DrawPanel },
-  { id: 'image', label: 'Image', Panel: ImagePanel },
+  { id: 'images', label: 'Images', Panel: ImagesPanel },
   { id: 'widgets', label: 'Widgets', Panel: WidgetsPanel },
+  { id: 'connectors', label: 'Connectors', Panel: ConnectorsPanel },
+  { id: 'buttons', label: 'Glyph Button', Panel: ButtonsPanel },
 ] as const;
 
 const SETTINGS = [
   { id: 'connect', label: 'Phone', Panel: ConnectPanel },
-  { id: 'connectors', label: 'Connectors', Panel: ConnectorsPanel },
-  { id: 'buttons', label: 'Glyph Button', Panel: ButtonsPanel },
   { id: 'desktop', label: 'Desktop', Panel: DesktopPanel },
   { id: 'developer', label: 'Developer', Panel: DeveloperPanel },
 ] as const;
@@ -67,6 +66,8 @@ export function App() {
       setSetting(null);
     } else if (SETTINGS.some((s) => s.id === id)) setSetting(id as SettingId);
   }, []);
+  // The Developer page is opt-in; if it is switched off while open, fall back to Desktop.
+  const shownSetting = setting === 'developer' && !bridge.settings.developer ? 'desktop' : setting;
 
   return (
     <div className="app">
@@ -81,6 +82,11 @@ export function App() {
           <span className={`dot ${bridge.connection}`} aria-hidden="true" />
           {STATUS[bridge.connection]}
           {bridge.connection === 'connected' && bridge.phoneName ? ` to ${bridge.phoneName}` : ''}
+          {bridge.connection === 'connected' && bridge.phoneBattery && (
+            <span className={bridge.phoneBattery.level <= 15 && !bridge.phoneBattery.charging ? 'phone-battery low' : 'phone-battery'} title={`Phone battery${bridge.phoneBattery.charging ? ', charging' : ''}`}>
+              {bridge.phoneBattery.level}%{bridge.phoneBattery.charging ? ' +' : ''}
+            </span>
+          )}
         </button>
         <button
           className={setting ? 'top-link on' : 'top-link'}
@@ -100,7 +106,7 @@ export function App() {
         </div>
       )}
 
-      {setting ? <SettingsView current={setting} pick={setSetting} go={go} /> : <StageView mode={mode} pick={setMode} go={go} />}
+      {shownSetting ? <SettingsView current={shownSetting} pick={setSetting} go={go} /> : <StageView mode={mode} pick={setMode} go={go} />}
     </div>
   );
 }
@@ -153,9 +159,20 @@ function StageView({ mode, pick, go }: { mode: ModeId; pick: (id: ModeId) => voi
               onChange={(ev) => updateSettings({ textSpeed: 180 - Number(ev.target.value) })}
             />
           </label>
-          <button className="ghost" onClick={clearMatrix} disabled={!bridge.playing}>
-            Clear
-          </button>
+          <div className="hero-actions">
+            <button className="ghost" onClick={clearMatrix} disabled={!bridge.playing}>
+              Clear
+            </button>
+            <button
+              className="ghost"
+              aria-pressed={bridge.settings.island}
+              title="The pill on the desktop that mirrors the matrix. Where it sits: Settings, Desktop."
+              onClick={() => updateSettings({ island: !bridge.settings.island })}
+            >
+              <span className={bridge.settings.island ? 'dot connected' : 'dot'} aria-hidden="true" />
+              {bridge.settings.island ? 'Hide island' : 'Show island'}
+            </button>
+          </div>
         </div>
       </section>
 
@@ -183,7 +200,7 @@ function SettingsView({ current, pick, go }: { current: SettingId; pick: (id: Se
   return (
     <div className="settings">
       <nav className="settings-nav" aria-label="Settings">
-        {SETTINGS.map((s) => (
+        {SETTINGS.filter((s) => s.id !== 'developer' || bridge.settings.developer).map((s) => (
           <button key={s.id} className={s.id === current ? 'tab active' : 'tab'} onClick={() => pick(s.id)}>
             <span className="tab-label">{s.label}</span>
             {s.id === 'connect' && <span className={`dot ${bridge.connection}`} aria-hidden="true" />}
@@ -278,6 +295,14 @@ function DesktopPanel(_: { go: (id: string) => void }) {
           <p className="muted">Only in the desktop app.</p>
         )}
         <p className="hint">Started with Windows, it waits in the tray. Closing the window also keeps it running there; Quit is in the tray menu.</p>
+      </section>
+      <section className="card">
+        <h2>Developer</h2>
+        <p>For scripting the matrix: the "matrix" command line tool and this app's local HTTP API.</p>
+        <label className="check">
+          <input type="checkbox" checked={bridge.settings.developer} onChange={(ev) => updateSettings({ developer: ev.target.checked })} />
+          Show the Developer page
+        </label>
       </section>
     </>
   );

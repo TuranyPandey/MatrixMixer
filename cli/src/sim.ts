@@ -37,6 +37,8 @@ export type Simulator = {
   readonly frame: Frame;
   readonly brightness: number;
   readonly clients: number;
+  /** The glyph a PC asked the phone to keep, if any. */
+  readonly stored: { name: string; frames: number[][]; delay: number } | null;
   /** Pretend the Glyph Button was used. Only delivered while the toy is "selected". */
   pressButton(action: ButtonAction): void;
   /** Pretend the PC Remote toy was selected or deselected. */
@@ -59,6 +61,7 @@ export async function startSimulator(options: SimulatorOptions = {}): Promise<Si
   let frame = blankFrame();
   let brightness = 255;
   let toy = false;
+  let stored: Simulator['stored'] = null;
 
   const wss = new WebSocketServer({ port: options.port ?? DEFAULT_PORT });
   await new Promise<void>((resolve, reject) => {
@@ -75,6 +78,8 @@ export async function startSimulator(options: SimulatorOptions = {}): Promise<Si
     authed.add(ws);
     send(ws, { t: 'ready' });
     send(ws, { t: 'status', toy });
+    // A real phone reports its own battery here and whenever it changes.
+    send(ws, { t: 'battery', level: 76, charging: false });
   };
 
   wss.on('connection', (ws) => {
@@ -118,6 +123,11 @@ export async function startSimulator(options: SimulatorOptions = {}): Promise<Si
       if (!authed.has(ws)) {
         return send(ws, { t: 'error', code: 'unauthorized', message: 'Pair first' });
       }
+      if (msg.t === 'store') {
+        stored = { name: msg.name, frames: msg.frames, delay: msg.delay };
+        log(`Keeping "${msg.name}" (${msg.frames.length} ${msg.frames.length === 1 ? 'frame' : 'frames'})`);
+        return send(ws, { t: 'stored', name: msg.name });
+      }
       if (msg.t === 'frame') frame = frameFromArray(msg.px);
       else if (msg.t === 'brightness') brightness = msg.value;
       else if (msg.t === 'clear') frame = blankFrame();
@@ -151,6 +161,9 @@ export async function startSimulator(options: SimulatorOptions = {}): Promise<Si
     },
     get clients() {
       return authed.size;
+    },
+    get stored() {
+      return stored;
     },
     pressButton(action) {
       if (!toy) return;

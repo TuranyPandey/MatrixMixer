@@ -3,6 +3,9 @@
     <string name="app_name">MatrixMixer</string>
     <string name="toy_name">PC Remote</string>
     <string name="toy_summary">Shows what your PC sends and turns a long-press of the Glyph Button into a PC action.</string>
+    <string name="glyph_toy_name">My Glyph</string>
+    <string name="glyph_toy_summary">Shows the picture or animation you sent from the Draw page of MatrixMixer. Works without the PC.</string>
+    <string name="tile_label">MatrixMixer</string>
     <string name="channel_name">Bridge status</string>
     <string name="channel_description">Shown while the phone is listening for your PC</string>
 </resources>

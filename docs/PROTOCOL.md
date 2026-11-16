@@ -48,6 +48,7 @@ Anything other than `pair`, `auth` and `ping` is answered with `error unauthoriz
 | `brightness` | `value`: integer 0-255 | Global multiplier applied to every frame. |
 | `clear` | | Turn the matrix off and forget the last frame. |
 | `ping` | | Keep-alive. Answered with `pong`. |
+| `store` | `name`: string, `frames`: 1 to 24 arrays of 625 integers, `delay`: integer 50-1000 | A picture or animation for the phone to keep. `delay` is milliseconds per frame. Replaces the one kept before. Answered with `stored`. |
 
 The matrix is round: only 489 of the 625 cells are LEDs. Row widths from top to bottom are `7 11 15 17 19 21 21 23 23 25 25 25 25 25 25 25 23 23 21 21 19 17 15 11 7`, centred. Values for the missing corner cells are ignored.
 
@@ -63,6 +64,8 @@ The phone draws at most about 30 frames a second and keeps only the newest frame
 | `status` | `toy`: boolean | Whether the PC Remote toy is the selected Glyph Toy. Sent after `ready` and on every change. |
 | `event` | `source`: `"button"`, `action`: `"long"` \| `"down"` \| `"up"` | Glyph Button activity. Only while `toy` is true. |
 | `pong` | | Answer to `ping`. |
+| `stored` | `name`: string | The glyph from `store` is saved. |
+| `battery` | `level`: integer 0-100, `charging`: boolean | The phone's own battery. Sent after `ready` and whenever it changes. |
 | `error` | `code`, `message` | See below. The connection stays open. |
 
 Error codes: `bad_code` (wrong pairing code), `locked` (5 wrong codes; pairing refused for 30 s and the code changes), `bad_token` (token unknown, pair again), `unauthorized` (sent a command before pairing), `bad_message` (malformed or unknown message).
@@ -74,4 +77,7 @@ Error codes: `bad_code` (wrong pairing code), `locked` (5 wrong codes; pairing r
 - Tokens never expire. The phone forgets one when the user taps **Forget** next to that PC.
 - When the last PC disconnects the phone keeps the current frame for 30 seconds, then blanks the matrix.
 - Several PCs may be connected at once. The newest frame wins.
+- The phone keeps one stored glyph. It shows it in its "My Glyph" toy, and as its resting face if the user chose that. The phone never draws anything itself: it only replays frames a PC rendered.
+- `store`, `stored` and `battery` were added after the first release. A phone app that predates them answers `store` with `error bad_message`; a PC that predates them ignores `stored` and `battery`.
+- When the last PC disconnects, what happens next is the phone user's choice: go dark after 30 seconds (the default), keep the last frame, or show the stored glyph.
 - Either side may drop a silent connection: the PC after 13 s without any message, the phone after 15 s without a WebSocket pong.

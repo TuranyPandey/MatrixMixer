@@ -1,7 +1,7 @@
 /**
  * Activities: things that hold the matrix for as long as they are going on,
  * then hand it back. A job's progress, the on-air light, the track that just
- * started, the next meeting, a game's HUD.
+ * started, the run-up to the next meeting, a game's HUD.
  *
  * Like connectors.ts they live outside React so they work on any tab and with
  * the window hidden, and they go through `player.notify`, so whatever was
@@ -9,15 +9,16 @@
  * while one is up dismisses it until the next time it starts.
  */
 import { useSyncExternalStore } from 'react';
-import { gameFrame, liveSource, onAirFrame, progressFrame, upcomingEvents, type CalendarEvent } from '@matrix-bridge/core';
-import { apiHandlers, getSettings, player } from './bridge';
+import { countdownFrame, gameFrame, liveSource, onAirFrame, progressFrame, upcomingEvents, type CalendarEvent } from '@matrix-bridge/core';
+import { apiHandlers, getSettings, player, registerAction } from './bridge';
 import { afterConnectorChange, notify } from './connectors';
-import { fetchText, nowPlaying, onAir } from './native';
+import { fetchText, micToggle, nowPlaying, onAir } from './native';
 
 export type ActivityState = {
   /** A job in progress, 0-100. Null when none. */
   progress: { value: number; label: string } | null;
-  onAir: { mic: boolean; camera: boolean };
+  /** `muted` is the system microphone's mute switch, whether or not anything is using the microphone. */
+  onAir: { mic: boolean; camera: boolean; muted: boolean };
   /** What Windows says is playing. Null when nothing is. */
   track: { title: string; artist: string; playing: boolean } | null;
   calendar: { checkedAt: number | null; error: string | null; next: CalendarEvent | null };
@@ -27,7 +28,7 @@ export type ActivityState = {
 
 let state: ActivityState = {
   progress: null,
-  onAir: { mic: false, camera: false },
+  onAir: { mic: false, camera: false, muted: false },
   track: null,
   calendar: { checkedAt: null, error: null, next: null },
   gameAt: null,
@@ -109,7 +110,8 @@ let onAirTimer: ReturnType<typeof setInterval> | null = null;
 function onAirWord(): string | null {
   const { mic, camera } = getSettings().connectors.onair;
   const live = { mic: mic && state.onAir.mic, camera: camera && state.onAir.camera };
-  return live.camera ? 'CAM' : live.mic ? 'MIC' : null;
+  // The camera cannot be muted from here, so it wins. A muted microphone still counts as a call going on.
+  return live.camera ? 'CAM' : live.mic ? (state.onAir.muted ? 'MUTED' : 'MIC') : null;
 }
 
 async function checkOnAir(): Promise<void> {
@@ -123,11 +125,24 @@ async function checkOnAir(): Promise<void> {
     player.notify(
       liveSource('on air', 700, (tick) => {
         const word = getSettings().connectors.onair.enabled ? onAirWord() : null;
-        return word ? onAirFrame(word, tick) : null;
+        // Live breathes; muted holds still and dim, so the two cannot be mistaken for each other.
+        return word ? onAirFrame(word, word === 'MUTED' ? 1 : tick) : null;
       }),
     );
   }
 }
+
+/**
+ * "Mute microphone" for the Glyph Button: flips the system mute switch. With the
+ * on-air light up, the light itself changes; otherwise a word passes to say which way it went.
+ */
+registerAction('mute_mic', async () => {
+  const muted = await micToggle();
+  const lightUp = getSettings().connectors.onair.enabled && onAirWord() !== null;
+  publish({ onAir: { ...state.onAir, muted } });
+  if (!lightUp) notify('Microphone', muted ? 'MIC OFF' : 'MIC ON');
+  return muted ? 'Microphone muted' : 'Microphone live';
+});
 
 // ---- now playing --------------------------------------------------------------------
 
@@ -191,8 +206,40 @@ async function checkCalendar(): Promise<void> {
       notify('Calendar', text);
     };
     if (minutes <= 0) say('now', `NOW: ${title}`);
-    else if (minutes <= lead) say('soon', `IN ${minutes} MIN: ${title}`);
+    else if (minutes <= lead) {
+      say('soon', `IN ${minutes} MIN: ${title}`);
+      countDownTo(event, lead);
+    }
   }
+}
+
+/** After the warning has passed, a disk drains until the event starts. Once per event. */
+function countDownTo(event: CalendarEvent, lead: number): void {
+  if (!getSettings().connectors.calendar.countdown) return;
+  const key = `disk|${event.start}|${event.title}`;
+  if (announced.has(key)) return;
+  announced.add(key);
+  player.notify(
+    liveSource(`meeting: ${event.title.slice(0, 40)}`, 1000, () => {
+      const { enabled, countdown } = getSettings().connectors.calendar;
+      const left = event.start - Date.now();
+      return enabled && countdown && left > 0 ? countdownFrame(left / (lead * 60_000)) : null;
+    }),
+  );
+}
+
+// ---- reminder -----------------------------------------------------------------------
+
+let reminderTimer: ReturnType<typeof setInterval> | null = null;
+let reminderKey = '';
+
+function syncReminder(): void {
+  const { enabled, text, every: minutes } = getSettings().connectors.reminder;
+  const key = enabled && text.trim() ? `${minutes}|${text}` : '';
+  if (key === reminderKey) return;
+  reminderKey = key;
+  if (reminderTimer) clearInterval(reminderTimer);
+  reminderTimer = key ? setInterval(() => notify('Reminder', text.trim().toUpperCase()), Math.max(1, minutes) * 60_000) : null;
 }
 
 // ---- game HUD (Counter-Strike 2 game state integration) ------------------------------
@@ -246,7 +293,8 @@ function every(timer: ReturnType<typeof setInterval> | null, on: boolean, ms: nu
 export function syncActivities(): void {
   const { onair, music, calendar } = getSettings().connectors;
   onAirTimer = every(onAirTimer, onair.enabled, ON_AIR_EVERY_MS, checkOnAir);
-  if (!onair.enabled) publish({ onAir: { mic: false, camera: false } });
+  if (!onair.enabled) publish({ onAir: { ...state.onAir, mic: false, camera: false } });
+  syncReminder();
   musicTimer = every(musicTimer, music.enabled, MUSIC_EVERY_MS, checkMusic);
   if (!music.enabled) lastTrack = '';
   const calendarOn = calendar.enabled && calendar.url.trim() !== '';

@@ -6,5 +6,7 @@ export * from './widgets';
 export * from './player';
 export * from './connectors';
 export * from './faces';
+export * from './ambient';
+export * from './designs';
 export * from './calendar';
 export * from './client';

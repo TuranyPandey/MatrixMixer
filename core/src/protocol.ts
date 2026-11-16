@@ -25,6 +25,14 @@ export type FrameMessage = { t: 'frame'; px: number[] };
 export type BrightnessMessage = { t: 'brightness'; value: number };
 export type ClearMessage = { t: 'clear' };
 export type PingMessage = { t: 'ping' };
+/** The most frames a stored glyph may have. */
+export const MAX_STORED_FRAMES = 24;
+/**
+ * A picture or animation for the phone to keep and show with no PC connected
+ * (its "My Glyph" toy, and its resting face). 1 to 24 frames of 625 values;
+ * `delay` is milliseconds per frame, 50-1000. Replaces whatever was kept before.
+ */
+export type StoreMessage = { t: 'store'; name: string; frames: number[][]; delay: number };
 
 export type PcMessage =
   | PairMessage
@@ -32,7 +40,8 @@ export type PcMessage =
   | FrameMessage
   | BrightnessMessage
   | ClearMessage
-  | PingMessage;
+  | PingMessage
+  | StoreMessage;
 
 // ---- phone -> PC -----------------------------------------------------------
 
@@ -47,6 +56,10 @@ export type EventMessage = { t: 'event'; source: 'button'; action: ButtonAction 
 /** `toy` is true while the PC Remote toy is selected on the phone. */
 export type StatusMessage = { t: 'status'; toy: boolean };
 export type PongMessage = { t: 'pong' };
+/** Answer to `store`: the glyph is saved on the phone. */
+export type StoredMessage = { t: 'stored'; name: string };
+/** The phone's own battery. Sent after `ready` and whenever it changes. `level` is 0-100. */
+export type BatteryMessage = { t: 'battery'; level: number; charging: boolean };
 
 export type PhoneMessage =
   | HelloMessage
@@ -55,7 +68,9 @@ export type PhoneMessage =
   | ErrorMessage
   | EventMessage
   | StatusMessage
-  | PongMessage;
+  | PongMessage
+  | StoredMessage
+  | BatteryMessage;
 
 // ---- encode / decode -------------------------------------------------------
 
@@ -102,6 +117,21 @@ export function decodePcMessage(text: string): PcMessage | null {
       return { t: 'clear' };
     case 'ping':
       return { t: 'ping' };
+    case 'store': {
+      const frames = m.frames;
+      const ok =
+        Array.isArray(frames) &&
+        frames.length >= 1 &&
+        frames.length <= MAX_STORED_FRAMES &&
+        frames.every((f) => Array.isArray(f) && f.length === PIXELS && f.every(isByte)) &&
+        typeof m.delay === 'number' &&
+        Number.isInteger(m.delay) &&
+        m.delay >= 50 &&
+        m.delay <= 1000;
+      return ok
+        ? { t: 'store', name: typeof m.name === 'string' ? m.name.slice(0, 40) : 'Glyph', frames: frames as number[][], delay: m.delay as number }
+        : null;
+    }
     default:
       return null;
   }
@@ -140,6 +170,12 @@ export function decodePhoneMessage(text: string): PhoneMessage | null {
       return typeof m.toy === 'boolean' ? { t: 'status', toy: m.toy } : null;
     case 'pong':
       return { t: 'pong' };
+    case 'stored':
+      return { t: 'stored', name: typeof m.name === 'string' ? m.name : '' };
+    case 'battery':
+      return typeof m.level === 'number' && m.level >= 0 && m.level <= 100 && typeof m.charging === 'boolean'
+        ? { t: 'battery', level: Math.round(m.level), charging: m.charging }
+        : null;
     default:
       return null;
   }

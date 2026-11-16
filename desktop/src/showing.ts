@@ -13,6 +13,7 @@ const WIDGET_NAMES: Record<string, string> = {
   ticker: 'Ticker',
   weather: 'Weather',
   timer: 'Timer',
+  ambient: 'Ambient',
 };
 
 export function describeShowing(label: string | null): Showing | null {

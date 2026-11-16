@@ -19,6 +19,8 @@ data class BridgeStatus(
     val toyActive: Boolean = false,
     /** This phone's Wi-Fi addresses, for typing into the PC by hand. */
     val addresses: List<String> = emptyList(),
+    /** Name of the glyph a PC stored on this phone. Null if there is none. */
+    val glyph: String? = null,
     val error: String? = null,
 )
 

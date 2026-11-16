@@ -64,7 +64,8 @@ button.top-link:hover:not(:disabled), button.top-link.on { background: none; col
 .hero-side { width: 250px; display: flex; flex-direction: column; align-items: flex-start; }
 .hero-side .field { width: 100%; margin: 12px 0 0; }
 .hero-side .field .label { margin-bottom: 2px; }
-.hero-side > button.ghost { margin-top: 14px; }
+.hero-actions { display: flex; gap: 8px; margin-top: 14px; }
+.hero-actions button { display: inline-flex; align-items: center; gap: 7px; }
 /* The outer ring turns red once a phone is really showing the frame. */
 .hero.lit.connected .matrix { box-shadow: 0 0 0 1px #2a2a2a, 0 0 0 10px #070707, 0 0 0 11px var(--accent); }
 .now { display: flex; flex-direction: column; gap: 4px; min-width: 0; max-width: 100%; }
@@ -325,6 +326,49 @@ button.inline:active:not(:disabled) { transform: none; }
 
 .tools .label { margin-bottom: -4px; }
 .tool-actions { margin: 4px 0 0; }
+/* Connectors: a shelf like the Widgets one. Each matrix shows what that connector sends; red ring = switched on. */
+.conn-shelf { margin-bottom: 10px; }
+.conn-shelf .shelf-item.off .matrix { opacity: 0.5; }
+.conn-shelf .shelf-item.off.picked .matrix { opacity: 0.9; }
+.conn-lede { color: var(--muted); font-size: 13px; text-align: center; margin: 0 0 20px; }
+.conn-now { display: flex; align-items: center; gap: 9px; font: 500 13px var(--mono); }
+.conn-recent { margin-top: 10px; }
+/* Glyph Button: the long-press is the page; everything else folds away. */
+.gb-status { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 13px; }
+.action-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+input.gb-command { width: 100%; margin-bottom: 8px; }
+.gb-rotation { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 14px; }
+.gb-rotation .row { margin: 10px 0 8px; }
+details.more { border-top: 1px solid var(--line); padding: 15px 0; }
+details.more > summary { cursor: pointer; list-style: none; color: var(--muted); font: 500 11px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: '+'; display: inline-block; width: 16px; }
+details.more[open] > summary::before { content: '\2013'; }
+details.more > summary:hover, details.more[open] > summary { color: var(--text); }
+details.more[open] > summary { margin-bottom: 12px; }
+details.more > :last-child { margin-bottom: 0; }
+/* Images: the three views, and the library's tiles. */
+.images-views { margin: 0 auto 6px; }
+.thumb.on .thumb-open .matrix { box-shadow: 0 0 0 1px #000, 0 0 0 3px var(--accent); }
+.thumb.on .thumb-open span { color: var(--accent); }
+.thumb-links { display: flex; gap: 12px; }
+/* Island, Images tab: one row of pictures that scrolls sideways. */
+.island-strip { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; scroll-behavior: smooth; }
+.island-strip::-webkit-scrollbar { display: none; }
+.island-strip .island-item { flex: none; }
+/* Draw: the strip of animation frames under the canvas. */
+.frames { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 16px; }
+.frame-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 14px; }
+button.frame { background: none; border: 0; border-radius: 50%; padding: 0; line-height: 0; }
+button.frame:hover:not(:disabled) { background: none; }
+.frame .matrix { margin: 3px; box-shadow: 0 0 0 1px var(--line-strong); }
+.frame.on .matrix { box-shadow: 0 0 0 1px #000, 0 0 0 3px var(--text); }
+.frame-time { width: 260px; margin-bottom: 0; }
+.keep-phone { margin: 4px 0 12px; }
+.keep-phone span { font-size: 13px; }
+/* The phone's own battery, in the status pill. */
+.phone-battery { margin-left: 9px; padding-left: 9px; border-left: 1px solid var(--line-strong); color: var(--muted); font: 500 12px var(--mono); }
+.phone-battery.low { color: var(--accent); }
 .save { width: 100%; border-top: 1px solid var(--line); padding-top: 14px; margin-top: 6px; display: flex; flex-direction: column; gap: 10px; }
 .save .row { margin: 0; }
 .drop:only-child, .drop.empty { justify-content: center; padding: 44px 18px; }

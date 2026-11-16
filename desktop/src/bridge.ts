@@ -11,6 +11,7 @@ import {
   noticeSource,
   rgbaToFrame,
   textSource,
+  type AmbientStyle,
   type ButtonAction,
   type ConnectionState,
   type Frame,
@@ -42,7 +43,9 @@ export type ConnectorSettings = {
   /** A notice when a new track starts. */
   music: { enabled: boolean };
   /** Notices before events from a private .ics link. `lead` is minutes of warning. */
-  calendar: { enabled: boolean; url: string; lead: number };
+  calendar: { enabled: boolean; url: string; lead: number; countdown: boolean };
+  /** A word that passes every `every` minutes: STRETCH, WATER. */
+  reminder: { enabled: boolean; text: string; every: number };
   /** Game HUD. `token` is what the game must send along; made once, on first use. */
   game: { enabled: boolean; token: string };
 };
@@ -55,6 +58,8 @@ export type WidgetSettings = {
   hour12: boolean;
   /** Widgets the Glyph Button steps through with its "Next widget" action, in order. */
   rotation: string[];
+  /** Which animation the Ambient widget plays. */
+  ambient: AmbientStyle;
 };
 
 export type Settings = {
@@ -75,6 +80,8 @@ export type Settings = {
   cursorDots: boolean;
   /** Its radius in pixels. */
   cursorRadius: number;
+  /** Show the Developer page (command line and HTTP API) under Settings. Off for most people. */
+  developer: boolean;
 };
 
 const DEFAULTS: Settings = {
@@ -92,13 +99,15 @@ const DEFAULTS: Settings = {
     battery: { enabled: false, low: 20 },
     onair: { enabled: false, mic: true, camera: true },
     music: { enabled: false },
-    calendar: { enabled: false, url: '', lead: 10 },
+    calendar: { enabled: false, url: '', lead: 10, countdown: false },
+    reminder: { enabled: false, text: 'STRETCH', every: 45 },
     game: { enabled: false, token: '' },
   },
-  widgets: { ticker: ['BTC-USD', 'ETH-USD', 'AAPL'], weather: null, hour12: false, rotation: ['clock', 'system meter', 'load graph', 'visualiser'] },
+  widgets: { ticker: ['BTC-USD', 'ETH-USD', 'AAPL'], weather: null, hour12: false, rotation: ['clock', 'system meter', 'load graph', 'visualiser'], ambient: 'rain' },
   textSpeed: 60,
   cursorDots: true,
   cursorRadius: 110,
+  developer: false,
   island: true,
   islandPlace: 1,
 };
@@ -118,6 +127,7 @@ function loadSettings(): Settings {
         onair: { ...DEFAULTS.connectors.onair, ...saved.connectors?.onair },
         music: { ...DEFAULTS.connectors.music, ...saved.connectors?.music },
         calendar: { ...DEFAULTS.connectors.calendar, ...saved.connectors?.calendar },
+        reminder: { ...DEFAULTS.connectors.reminder, ...saved.connectors?.reminder },
         game: { ...DEFAULTS.connectors.game, ...saved.connectors?.game },
       },
       widgets: { ...DEFAULTS.widgets, ...saved.widgets },
@@ -142,6 +152,8 @@ export type BridgeState = {
   connection: ConnectionState;
   phoneName: string | null;
   toyActive: boolean;
+  /** The phone's own battery, 0-100. Null until it says, and with older phone apps. */
+  phoneBattery: { level: number; charging: boolean } | null;
   /** Last problem worth showing, in plain words. Cleared on the next success. */
   error: string | null;
   /** A pairing code was sent and the phone has not answered yet. */
@@ -156,6 +168,7 @@ let state: BridgeState = {
   connection: 'offline',
   phoneName: null,
   toyActive: false,
+  phoneBattery: null,
   error: null,
   pairPending: false,
   playing: null,
@@ -252,6 +265,7 @@ export async function connect(host: string, port: number): Promise<void> {
   });
   c.on('paired', (token) => updateSettings({ token }));
   c.on('toy', (toyActive) => set({ toyActive }));
+  c.on('battery', (level, charging) => client === c && set({ phoneBattery: { level, charging } }));
   c.on('error', (code, message) => {
     // A client that was replaced may still be closing; what it hears is no longer news.
     if (client !== c) return;
@@ -262,14 +276,14 @@ export async function connect(host: string, port: number): Promise<void> {
   });
   c.on('button', (action) => void handleButton(action));
   c.setBrightness(state.settings.brightness);
-  set({ error: null, toyActive: false });
+  set({ error: null, toyActive: false, phoneBattery: null });
   c.connect();
 }
 
 export function disconnect(): void {
   client?.disconnect();
   client = null;
-  set({ connection: 'offline', toyActive: false });
+  set({ connection: 'offline', toyActive: false, phoneBattery: null });
 }
 
 export function clearError(): void {
@@ -280,6 +294,29 @@ export function pair(code: string): void {
   if (!client || client.pairing) return;
   client.pair(code);
   set({ error: null, pairPending: client.pairing });
+}
+
+/**
+ * Asks the phone to keep a drawing or animation, so it can show it with no PC
+ * around (its My Glyph toy, and its resting face). Rejects with words for the user.
+ */
+export function keepOnPhone(name: string, frames: Frame[], delayMs: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const c = client;
+    if (!c || c.state !== 'connected') return reject(new Error('No phone linked. Link one first.'));
+    const finish = (problem?: string) => {
+      clearTimeout(timer);
+      offStored();
+      offError();
+      if (problem) reject(new Error(problem));
+      else resolve();
+    };
+    const offStored = c.on('stored', () => finish());
+    // A phone app from before this feature does not know the message.
+    const offError = c.on('error', (code) => code === 'bad_message' && finish('The phone app is too old for this. Update it from the same release as this app.'));
+    const timer = setTimeout(() => finish('The phone did not answer. Try again.'), 5000);
+    if (!c.store(name, frames, delayMs)) finish('No phone linked. Link one first.');
+  });
 }
 
 /** Forget the pairing on this PC. The phone keeps its side until "Forget" is tapped there. */

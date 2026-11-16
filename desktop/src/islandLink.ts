@@ -26,7 +26,7 @@ export type IslandState = {
 };
 
 /** Widgets the island can put on the matrix, by what follows "widget: " in `playing`. */
-export type IslandWidget = 'clock' | 'system meter' | 'load graph' | 'visualiser' | 'ticker' | 'weather';
+export type IslandWidget = 'clock' | 'system meter' | 'load graph' | 'visualiser' | 'ticker' | 'weather' | 'ambient';
 
 /** Readings for the island's Widgets tab. Only sent while that tab is open. */
 export type IslandLive = {
@@ -40,16 +40,29 @@ export type IslandLive = {
   /** The clock widget's 12-hour setting, and the first ticker symbol, for the previews. */
   hour12: boolean;
   symbol: string | null;
+  /** The Ambient widget's chosen animation: 'rain', 'stars' or 'life'. */
+  ambient: 'rain' | 'stars' | 'life';
 };
 
 /** Main window to island. */
-export type ToIsland = { t: 'state'; state: IslandState } | { t: 'frame'; px: number[] } | { t: 'live'; live: IslandLive };
+/** One picture from the library, for the island's Images tab. `px` is its first frame. */
+export type IslandImage = { id: string; name: string; px: number[]; frames: number; builtin: boolean };
+
+export type ToIsland =
+  | { t: 'state'; state: IslandState }
+  | { t: 'frame'; px: number[] }
+  | { t: 'live'; live: IslandLive }
+  | { t: 'images'; images: IslandImage[] };
 
 /** Island to main window. */
 export type FromIsland =
   | { t: 'hello' }
   | { t: 'text'; text: string }
   | { t: 'widget'; name: IslandWidget }
+  /** The Images tab opened: send the library. */
+  | { t: 'images' }
+  /** Put this picture (an `IslandImage.id`) on the matrix. */
+  | { t: 'image'; id: string }
   /** The Widgets tab came into view (or went away): start or stop sending readings. */
   | { t: 'watch'; on: boolean }
   /** `start` begins a 25/5 Pomodoro, `toggle` pauses or resumes, `stop` ends or dismisses. */

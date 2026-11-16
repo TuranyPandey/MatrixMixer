@@ -6,8 +6,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { formatDuration, frameFromArray, tickerLine, type ConnectionState, type Frame } from '@matrix-bridge/core';
-import { receive, send, type IslandLive, type IslandState, type IslandWidget } from './islandLink';
+import { AMBIENT_STYLES, formatDuration, frameFromArray, tickerLine, type ConnectionState, type Frame } from '@matrix-bridge/core';
+import { receive, send, type IslandImage, type IslandLive, type IslandState, type IslandWidget } from './islandLink';
 import { MatrixView } from './MatrixView';
 import { isTauri } from './native';
 import { describeShowing, showingLine } from './showing';
@@ -57,6 +57,7 @@ function Widgets({ live, playing, notReady }: { live: IslandLive | null; playing
     history: history.current,
     symbol: live?.symbol ?? null,
     weather: live?.weather ?? null,
+    ambient: live?.ambient ?? 'rain',
   });
 
   const blocked = (id: ShelfId) => id !== 'timer' && id !== showing && notReady.includes(id);
@@ -99,6 +100,7 @@ function Widgets({ live, playing, notReady }: { live: IslandLive | null; playing
       : weather
         ? `${weather.place}  ${Math.round(weather.temperature)}\u00b0${weather.fahrenheit ? 'F' : 'C'}`
         : 'Fetching',
+    ambient: AMBIENT_STYLES.find((s) => s.id === (live?.ambient ?? 'rain'))!.name,
   };
   const name = SHELF.find((w) => w.id === focus)!.name;
 
@@ -137,11 +139,62 @@ function Widgets({ live, playing, notReady }: { live: IslandLive | null; playing
   );
 }
 
+/**
+ * The Images tab: every saved and ready-made picture in one row that scrolls
+ * sideways. Like the widget shelf, a click only picks; the button shows it.
+ */
+function Images({ images, playing }: { images: IslandImage[] | null; playing: string | null }) {
+  const showing = images?.find((i) => playing === `image: ${i.name}`)?.id ?? null;
+  const [picked, setPicked] = useState<string | null>(null);
+  const focus = images?.find((i) => i.id === (picked ?? showing)) ?? images?.[0] ?? null;
+  const act = (image: IslandImage) => send('island:from', image.id === showing ? { t: 'clear' } : { t: 'image', id: image.id });
+
+  if (!images) return <div className="island-read"><span className="value">Fetching</span></div>;
+  return (
+    <div className="island-widgets">
+      <div
+        className="island-strip"
+        role="listbox"
+        aria-label="Pictures"
+        // A mouse wheel moves the row sideways; there is nothing to scroll up or down here.
+        onWheel={(ev) => (ev.currentTarget.scrollLeft += ev.deltaY + ev.deltaX)}
+      >
+        {images.map((image) => (
+          <button
+            key={image.id}
+            role="option"
+            aria-selected={image.id === showing}
+            aria-label={image.name}
+            className={`island-item${image.id === showing ? ' on' : ''}${image.id === focus?.id ? ' focus' : ''}`}
+            title={`${image.name}. Double-click to ${image.id === showing ? 'take it off' : 'put it on the matrix'}`}
+            onClick={() => setPicked(image.id)}
+            onDoubleClick={() => act(image)}
+          >
+            <MatrixView frame={frameFromArray(image.px)} size={40} label={image.name} />
+          </button>
+        ))}
+      </div>
+      {focus && (
+        <div className={focus.id === showing ? 'island-read on' : 'island-read'}>
+          <span className="name">{focus.name}</span>
+          <span className="value">
+            {focus.frames > 1 ? `${focus.frames} frames` : focus.builtin ? 'Ready-made' : 'Yours'} · {images.length} to scroll through
+          </span>
+          <button className="act" onClick={() => act(focus)}>
+            {focus.id === showing ? 'Take off' : 'Show'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Island() {
   const [state, setState] = useState<IslandState | null>(null);
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
-  const [tab, setTab] = useState<'text' | 'widgets'>('text');
+  const [tab, setTab] = useState<'text' | 'widgets' | 'images'>('text');
+  const [images, setImages] = useState<IslandImage[] | null>(null);
   const [live, setLive] = useState<IslandLive | null>(null);
   const frame = useRef<Frame>(new Uint8Array(625));
   const painters = useRef(new Set<(frame: Frame) => void>());
@@ -152,6 +205,7 @@ export function Island() {
     const stop = receive('island:to', (message) => {
       if (message.t === 'state') setState(message.state);
       else if (message.t === 'live') setLive(message.live);
+      else if (message.t === 'images') setImages(message.images);
       else {
         frame.current = frameFromArray(message.px);
         painters.current.forEach((draw) => draw(frame.current));
@@ -172,11 +226,18 @@ export function Island() {
     setOpen(next);
   }, []);
 
-  // The window is sized natively: the Widgets tab needs a taller panel than the Text tab.
+  // The window is sized natively: the Widgets and Images tabs need a taller panel than the Text tab.
   const widgetsUp = open && tab === 'widgets';
+  const imagesUp = open && tab === 'images';
+  const tall = widgetsUp || imagesUp;
   useEffect(() => {
-    if (isTauri) void invoke('island_expand', { expanded: open, tall: widgetsUp }).catch(() => {});
-  }, [open, widgetsUp]);
+    if (isTauri) void invoke('island_expand', { expanded: open, tall }).catch(() => {});
+  }, [open, tall]);
+
+  // The library is fetched when its tab comes into view; later changes arrive by themselves.
+  useEffect(() => {
+    if (imagesUp) send('island:from', { t: 'images' });
+  }, [imagesUp]);
 
   // Readings are only gathered while the Widgets tab is on screen.
   useEffect(() => {
@@ -261,6 +322,9 @@ export function Island() {
             <button role="tab" aria-selected={tab === 'widgets'} className={tab === 'widgets' ? 'on' : ''} onClick={() => setTab('widgets')}>
               Widgets
             </button>
+            <button role="tab" aria-selected={tab === 'images'} className={tab === 'images' ? 'on' : ''} onClick={() => setTab('images')}>
+              Images
+            </button>
           </div>
 
           {tab === 'text' ? (
@@ -283,8 +347,10 @@ export function Island() {
                 onBlur={() => (typing.current = false)}
               />
             </form>
-          ) : (
+          ) : tab === 'widgets' ? (
             <Widgets live={live} playing={playing} notReady={state?.notReady ?? []} />
+          ) : (
+            <Images images={images} playing={playing} />
           )}
 
           <div className="island-actions">

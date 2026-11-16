@@ -28,6 +28,39 @@ class ProtocolTest {
         assertNull(Protocol.parse(frame { "9" }))
     }
 
+    private fun store(frames: Int, delay: Any, fill: Any = 7) = JSONObject()
+        .put("t", "store").put("name", "Wave").put("delay", delay)
+        .put("frames", JSONArray((0 until frames).map { JSONArray((0 until Protocol.PIXELS).map { fill }) }))
+        .toString()
+
+    @Test
+    fun `reads a glyph to keep`() {
+        val msg = Protocol.parse(store(3, 200)) as Protocol.PcMessage.Store
+        assertEquals("Wave", msg.name)
+        assertEquals(3, msg.frames.size)
+        assertEquals(200, msg.delayMs)
+        assertArrayEquals(IntArray(Protocol.PIXELS) { 7 }, msg.frames[2])
+    }
+
+    @Test
+    fun `rejects glyphs with no frames, too many, a bad frame or a bad delay`() {
+        assertNull(Protocol.parse(store(0, 200)))
+        assertNull(Protocol.parse(store(Protocol.MAX_STORED_FRAMES + 1, 200)))
+        assertNull(Protocol.parse(store(2, 200, fill = 300)))
+        assertNull(Protocol.parse(store(2, 20)))
+        assertNull(Protocol.parse(store(2, 5000)))
+        assertNull(Protocol.parse(store(2, "200")))
+    }
+
+    @Test
+    fun `battery and stored are well formed`() {
+        val battery = JSONObject(Protocol.battery(140, true))
+        assertEquals("battery", battery.getString("t"))
+        assertEquals(100, battery.getInt("level"))
+        assertTrue(battery.getBoolean("charging"))
+        assertEquals("Wave", JSONObject(Protocol.stored("Wave")).getString("name"))
+    }
+
     @Test
     fun `rejects anything that is not a known message`() {
         assertNull(Protocol.parse("garbage"))
